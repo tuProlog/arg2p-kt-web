@@ -1,0 +1,93 @@
+html {
+  height: 100vh;
+  padding: 0;
+}
+
+body {
+  font-family: Roboto;
+  overflow: hidden;
+  height: 100vh;
+  padding: 5vh;
+}
+
+#theory, #query {
+  width : 100%;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  flex-grow: 1;
+}
+
+#inputFile {
+  margin: 10px 0;
+}
+
+/***************
+* SOLUTION TAB
+***************/
+.solutionResultWrapper{
+  border: 1px solid #EEE;
+  border-radius: 5px;
+  padding: 5px;
+  flex: 1 0 33%;
+}
+
+.solutionResultWrapper button {
+  margin: 10px;
+}
+
+#solutions .solutionResultWrapper li.halt{
+  background-color: rgba(255, 0, 0, 0.2);
+}
+
+#solutions .solutionResultWrapper li.no{
+  background-color: rgba(255, 255, 0, 0.2);
+}
+
+#solutions li:nth-child(odd){
+  background-color: #EEE;
+}
+
+.output{
+  display: flex;
+  flex-direction: column-reverse;
+  font-size: 14px;
+}
+
+/***************
+* GRAPH TAB
+***************/
+
+.graph-container {
+  height:100%;
+  width: 100%;
+  position: relative;
+}
+
+.graph-drawing, .graph-text {
+  height:100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.graph-text {
+  z-index: 10;
+  pointer-events: none;
+  justify-content: flex-start; 
+  padding: 10px;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(134, 136, 138, 0.3);
+  z-index: 2000;
+}
+
+a {
+  color: black;
+}
