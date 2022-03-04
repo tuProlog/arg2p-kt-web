@@ -2,7 +2,7 @@ import * as common from "../common.js"
 
 function queryService() {
 
-    const arg2p = common.tuprolog.arg2p()
+    const arg2p = common.tuprolog.arg2p.default_gdqvf0$()
     const ClassicSolverFactory = common.tuprolog.classic.ClassicSolverFactory;
     const outputChannel = common.tuprolog.solve.channel.OutputChannel;
     

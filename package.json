@@ -1,6 +1,6 @@
 {
   "name": "@tuprolog/arg2p-playground",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Arg2Prolog Web Playground",
   "main": "./app/control.mjs",
   "scripts": {
@@ -36,7 +36,7 @@
     "@tuprolog/2p-parser-theory": "0.20.1",
     "@tuprolog/2p-solve-classic": "0.20.1",
     "@tuprolog/2p-theory": "0.20.1",
-    "@tuprolog/arg2p-core": "file:./lib/arg2p-core",
+    "@tuprolog/arg2p-core": "0.6.4",
     "vis-network": "latest"
   }
 }

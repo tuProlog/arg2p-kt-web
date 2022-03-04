@@ -12,7 +12,7 @@ const tuprolog = {
     "theory": theory,
     "solve": solve,
     "classic": classic,
-    "arg2p": arg2p.arg2p,
+    "arg2p": arg2p.Arg2pSolver.Companion,
     "mining": arg2p.mining.mineGraph
 };
 
