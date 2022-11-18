@@ -1,6 +1,7 @@
 const path = require('path');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 const CompressionPlugin = require("compression-webpack-plugin");
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = {
 	entry: {
@@ -38,6 +39,7 @@ module.exports = {
 		}
 	},
 	plugins: [
+		new NodePolyfillPlugin(),
 		new CompressionPlugin(),
 		new HtmlWebpackPlugin({
 		  title: 'Arg2p Playground',
