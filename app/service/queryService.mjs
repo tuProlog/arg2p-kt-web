@@ -9,9 +9,9 @@ function queryService() {
     
     function solverOf(outputConsumer, flagsText) {
         var flags = common.tuprolog.theory.parsing.parseTheory("?", flagsText)
-        var libFlags = common.tuprolog.solve.library.Library.Companion.aliased('argumentation.flags', void 0, flags)
+        var libFlags = common.tuprolog.solve.library.Library.Companion.of('argumentation.flags', void 0, flags)
         return ClassicSolverFactory.mutableSolverWithDefaultBuiltinsAnd(
-            ClassicSolverFactory.defaultLibraries.plus(arg2p.to2pLibraries().plus(libFlags)),
+            ClassicSolverFactory.defaultRuntime.plusRuntime(arg2p.to2pLibraries().plusLibrary(libFlags)),
             ClassicSolverFactory.defaultFlags,
             common.tuprolog.theory.Theory.Companion.empty(),
             ClassicSolverFactory.defaultDynamicKb,
