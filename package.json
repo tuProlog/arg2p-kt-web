@@ -1,6 +1,6 @@
 {
   "name": "@tuprolog/arg2p-playground",
-  "version": "0.7.0",
+  "version": "0.8.2",
   "description": "Arg2Prolog Web Playground",
   "main": "./app/control.mjs",
   "scripts": {
@@ -33,14 +33,9 @@
     "node-polyfill-webpack-plugin": "2.0.1"
   },
   "dependencies": {
-    "@tuprolog/2p-core": "0.30.3",
-    "@tuprolog/2p-parser-theory": "0.30.3",
-    "@tuprolog/2p-solve-classic": "0.30.3",
-    "@tuprolog/2p-theory": "0.30.3",
-    "@tuprolog/2p-dsl-core": "0.30.3",
-    "kotlin": "1.7.21",
-    "kt-math": "0.6.3",
-    "@tuprolog/arg2p-core": "0.7.0",
-    "vis-network": "latest"
+    "kotlin": "1.9.24",
+    "@tuprolog/arg2p-core": "0.8.3",
+    "vis-network": "latest",
+    "sync-request": "latest"
   }
 }

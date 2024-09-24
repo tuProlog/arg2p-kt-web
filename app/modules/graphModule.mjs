@@ -1,4 +1,3 @@
-import * as common from "../common.js"
 import * as vis from "vis-network/standalone/index.js"
 
 function GraphModule() {
@@ -8,8 +7,8 @@ function GraphModule() {
         return { printGraph, clear }
     }
 
-    function printGraph(query, solver) {
-        print(solver)
+    function printGraph(graph) {
+        print(graph)
     }
 
     function clear() {
@@ -26,7 +25,7 @@ function GraphModule() {
         `
     }
 
-    function print(solver) {
+    function print(graph) {
 
         function _printTheory(argumentList) {
 
@@ -36,7 +35,7 @@ function GraphModule() {
             }
 
             document.querySelector("#graph-theory").innerHTML = argumentList
-                .reduce((a, b) => a + _format(b.argument.descriptor), "")
+                .reduce((a, b) => a + _format(b.descriptor), "")
         }
 
         function _printGraph(argumentList, attacks) {
@@ -56,15 +55,15 @@ function GraphModule() {
             const network = new vis.Network(document.querySelector("#graph-visual"), {
                 nodes: new vis.DataSet(argumentList.map(x => {
                     return {
-                        id: _toInt(x.argument.identifier),
-                        label: x.argument.identifier,
+                        id: _toInt(x.id),
+                        label: x.id,
                         color: _toColor(x.label)
                     }
                 })),
                 edges: new vis.DataSet(attacks.map(x => {
                     return {
-                        from: _toInt(x.attacker.identifier),
-                        to: _toInt(x.target.identifier),
+                        from: _toInt(x.from),
+                        to: _toInt(x.to),
                         arrows: "to"
                     }
                 }))
@@ -73,25 +72,17 @@ function GraphModule() {
             network.fit()
         }
 
-        const query = common.tuprolog.core.parsing.parseStringAsStructWithOperators("context_active(X)", solver.operators)
-        const formatter = common.tuprolog.core.TermFormatter.Companion.prettyExpressionsPrettyVariablesDefaultOperators();
-        const solution = parseInt(formatter.format(solver.solve(query).iterator().next().substitution.entries.toJSON()[0].value))
-        const graph = common.tuprolog.mining(solver, solution)
-        const labellings = getSolutions(graph.labellings.iterator())
+        // const query = common.tuprolog.core.parsing.parseStringAsStructWithOperators("context_active(X)", solver.operators)
+        // const formatter = common.tuprolog.core.TermFormatter.Companion.prettyExpressionsPrettyVariablesDefaultOperators();
+        // const solution = parseInt(formatter.format(solver.solve(query).iterator().next().substitution.entries.toJSON()[0].value))
+        // const graph = common.tuprolog.mining(solver, solution)
+        // const labellings = getSolutions(graph.labellings.iterator())
 
-        _printTheory(labellings)
-        _printGraph(labellings, getSolutions(graph.attacks.iterator()))
+        _printTheory(graph.arguments)
+        _printGraph(graph.arguments, graph.attacks)
     }
 
     return { init }
 }
 
 export default GraphModule()
-
-function getSolutions(iterator) {
-    const sol = []
-    while(iterator.hasNext()) {
-        sol.push(iterator.next())
-    }
-    return sol
-}

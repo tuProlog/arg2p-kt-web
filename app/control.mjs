@@ -1,11 +1,11 @@
-import '../assets/style.css'
+import '../assets/style.css';
 import { monaco } from './editor.mjs';
 
-import * as queryService from './service/queryService.mjs'
-import * as solutionResultModule from './modules/solutionResultModule.mjs'
-import * as consoleModule from './modules/consoleModule.mjs'
-import * as graphModule from './modules/graphModule.mjs'
-import * as flagsModule from './modules/flagsModule.mjs'
+import * as consoleModule from './modules/consoleModule.mjs';
+import * as flagsModule from './modules/flagsModule.mjs';
+import * as graphModule from './modules/graphModule.mjs';
+import * as solutionResultModule from './modules/solutionResultModule.mjs';
+import * as queryService from './service/queryService.mjs';
 
 const theoryField = document.querySelector("#theory");
 const queryField = document.querySelector("#query");
@@ -66,14 +66,14 @@ function startup() {
         consoleManager.clear()
         graphManager.clear()
 
-        const { i, query, solver } = queryService.default
+        const { i, query } = queryService.default
             .solve(theoryEditor.getValue(), queryEditor.getValue(), flagsManager.flags(), consoleManager.outputConsumer());
 
         resultManager.printSolution(i, query, () => {
             document.querySelector(".overlay").style.display = "block"
-        }, () => {
+        }, graph => {
             document.querySelector(".overlay").style.display = "none"
-            graphManager.printGraph(queryEditor.getValue(), solver)
+            graphManager.printGraph(graph)
         });
     });
 }
