@@ -33,7 +33,7 @@
     "node-polyfill-webpack-plugin": "2.0.1"
   },
   "dependencies": {
-    "kotlin": "1.9.24",
+    "kotlin": "1.9.25",
     "@tuprolog/arg2p-core": "0.9.0",
     "vis-network": "latest",
     "sync-request": "latest"
