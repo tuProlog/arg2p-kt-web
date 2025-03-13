@@ -18,9 +18,9 @@ const flagsContainer = document.querySelector("#flags");
 
 let theoryEditor = monaco.editor.create(theoryField, {
     value: [
-        'd1 : bird(X) => flies(X).',
-        'd2 : penguin(X) => bird(X).',
-        's1 : penguin(X) -> -flies(X).',
+        'd1(X) : bird(X) => flies(X).',
+        'd2(X) : penguin(X) => bird(X).',
+        's1(X) : penguin(X) -> -flies(X).',
         'a1 :-> penguin(tweety).'
     ].join('\n'),
     language: 'tuprolog',

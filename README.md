@@ -21,3 +21,15 @@
 * build and create production ready artifacts in `prodDist` folder.
 ### npm test
 * runs mocha test
+
+
+## Temporary fix
+
+Replace in 2p-solve.js:
+
+`return solverFactory(ModuleNames_instance.l2z(true), [ModuleNames_instance.l2z(false)])`
+
+with 
+
+`return require("./2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory`
+

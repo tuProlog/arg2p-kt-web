@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "kotlin": "1.9.24",
-    "@tuprolog/arg2p-core": "0.8.3",
+    "@tuprolog/arg2p-core": "0.9.0",
     "vis-network": "latest",
     "sync-request": "latest"
   }

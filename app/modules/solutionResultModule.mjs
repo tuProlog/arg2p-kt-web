@@ -58,13 +58,13 @@ function SolutionResultModule() {
 
     function printPrettySolutions(sol) {
         let element = document.createElement("li");
-        element.innerText = query; //formatter().format(sol.solvedQuery);
-        if (!sol.substitutions.isEmpty()) {
+        element.innerText = sol.query; //formatter().format(sol.solvedQuery);
+        if (sol.substitutions.length > 0) {
             let list = document.createElement('ul');
             let solutions = sol.substitutions.reduce((p, c) => {
                 let li = document.createElement('li');
-                // li.innerText = `${formatter().format(c.key)} : ${formatter().format(c.value)}`;
-                li.innerText = `${formatter().format(c.key)} : ${c.value}`;
+                //li.innerText = `${formatter().format(c.key)} : ${formatter().format(c.value)}`;
+                li.innerText = `${c.first} : ${c.second}`;
                 p.appendChild(li);
                 return p;
             }, list);
@@ -78,11 +78,11 @@ function SolutionResultModule() {
             beforeNext()
             new Promise((resolve, reject) => {
                 setTimeout(function() {
-                    solution = iterator.next()
+                    let solution = iterator.next()
                     addDomSolution(solution, list);
                     resolve(solution)
                 }, 0)
-            }).finally(sol => afterNext(sol.graph))
+            }).then(sol => afterNext(sol.graph))
         }
 
         nextButton.disabled = !iterator.hasNext();
