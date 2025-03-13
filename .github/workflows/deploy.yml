@@ -1,4 +1,4 @@
-name: Run Tests
+name: Deploy
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -25,8 +25,10 @@ jobs:
       - name: Build
         run: |
           npm run build
-      - name: Build
+      - name: Deploy
         run: |
+          git config --global user.email "g.pisano@unibo.it"
+          git config --global user.name "Giuseppe Pisano"
           npm run deploy
 
 
