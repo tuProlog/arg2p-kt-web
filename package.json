@@ -13,7 +13,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@babel/core": "7.20.2",
-    "@babel/plugin-proposal-class-properties": "7.18.6",
+    "@babel/plugin-transform-class-properties": "7.25.9",
     "@babel/preset-env": "7.20.2",
     "babel-loader": "10.0.0",
     "babel-register": "6.26.0",
@@ -25,12 +25,12 @@
     "mocha": "11.1.0",
     "monaco-editor": "0.34.1",
     "style-loader": "4.0.0",
-    "webpack": "5.75.0",
-    "webpack-cli": "5.0.0",
+    "webpack": "5.98.0",
+    "webpack-cli": "6.0.1",
     "webpack-dev-server": "5.2.0",
     "webpack-merge": "6.0.1",
-    "gh-pages": "4.0.0",
-    "node-polyfill-webpack-plugin": "2.0.1"
+    "gh-pages": "6.3.0",
+    "node-polyfill-webpack-plugin": "4.1.0"
   },
   "dependencies": {
     "kotlin": "1.9.25",

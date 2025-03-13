@@ -1,0 +1,39 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: |
+          npm install
+          sed -i 's/return solverFactory(ModuleNames_instance\.l2z(true), \[ModuleNames_instance\.l2z(false)\]);/return require\("\.\/2p-solve-classic\.js"\)\.it\.unibo\.tuprolog\.solve\.classic\.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p-core/2p-solve.js
+      - name: Run tests
+        run: |
+          npm test
+      - name: Build
+        run: |
+          npm run build
+      - name: Build
+        run: |
+          npm run deploy
+
+
+
+
+
+
+
+
+
