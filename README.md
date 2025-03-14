@@ -1,35 +1,33 @@
-# 2P-Kt Playground
-2P-Kt Playground Web project
+# [Arg2P-Kt](https://github.com/tuProlog/arg2p-kt) Web Playground
+
 ## Install
 ```bash
   npm install
+  sed -i 's/return solverFactory(ModuleNames_instance\.l2z(true), \[ModuleNames_instance\.l2z(false)\]);/return require\("\.\/2p-solve-classic\.js"\)\.it\.unibo\.tuprolog\.solve\.classic\.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p-core/2p-solve.js
 ```
+
 ## Usage
 
+- Start Webpack Dev server
 
 ```bash
-  "scripts": {
-    "start": "...",
-    "build": "...",
-    "test": "..."
-  },
+  npm start
 ```
-### npm start
-* start Webpack Dev server using unminified sourcers('js')
-### npm run build
-* run test
-* build and create production ready artifacts in `prodDist` folder.
-### npm test
-* runs mocha test
 
+- Run mocha test
 
-## Temporary fix
+```bash
+  npm test
+```
 
-Replace in 2p-solve.js:
+- Build and create production ready artifacts in `prodDist` folder
 
-`return solverFactory(ModuleNames_instance.l2z(true), [ModuleNames_instance.l2z(false)])`
+```bash
+  npm run build
+```
 
-with 
+- Deploy `prodDist` folder to Githun Pages
 
-`return require("./2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory`
-
+```bash
+  npm run deploy
+```
