@@ -4,7 +4,7 @@
 // const theory = require("@tuprolog/2p-full/2p-theory") //.it.unibo.tuprolog.theory;
 // core.parsing = require("@tuprolog/2p-full/2p-parser-core") //.it.unibo.tuprolog.core.parsing;
 // theory.parsing = require("@tuprolog/2p-full/2p-parser-theory") //.it.unibo.tuprolog.theory.parsing;
-const arg2p = require('@tuprolog/arg2p-core').it.unibo.tuprolog.argumentation.core
+const arg2p = require('@tuprolog/arg2p').it.unibo.tuprolog.argumentation
 
 const tuprolog = {
     // "core": core,
