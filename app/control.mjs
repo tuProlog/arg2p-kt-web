@@ -20,8 +20,13 @@ let theoryEditor = monaco.editor.create(theoryField, {
     value: [
         'd1(X) : bird(X) => flies(X).',
         'd2(X) : penguin(X) => bird(X).',
-        's1(X) : penguin(X) -> -flies(X).',
-        'a1 :-> penguin(tweety).'
+        'd3(X) : sparrow(X) => bird(X).',
+        '',
+        'p1(X) : penguin(X) => -flies(X).',
+        'p2(X) : penguin(X) => -d1(X).',
+        '',
+        'f1 :=> penguin(tweety).',
+        'f2 :=> sparrow(jack).'
     ].join('\n'),
     language: 'tuprolog',
     scrollbar: {
