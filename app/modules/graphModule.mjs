@@ -1,4 +1,4 @@
-import * as vis from "vis-network/standalone/index.js"
+import * as vis from "vis-network/standalone/esm/vis-network.js"
 
 function GraphModule() {
 
