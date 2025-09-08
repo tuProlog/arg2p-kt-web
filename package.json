@@ -1,6 +1,6 @@
 {
   "name": "@tuprolog/arg2p-playground",
-  "version": "0.10.0",
+  "version": "0.10.2",
   "description": "Arg2Prolog Web Playground",
   "main": "./app/control.mjs",
   "scripts": {
