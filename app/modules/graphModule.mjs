@@ -17,39 +17,67 @@ function GraphModule() {
     }
 
     function prepareContainer(container) {
-        container.innerHTML = `
-            <div class="graph-container">
-                <div id="graph-theory" class="graph-text"></div>
-                <div id="graph-visual" class="graph-drawing"></div>
+    container.innerHTML = `
+        <div class="graph-container" 
+             style="display:flex; height:100%; width:100%; overflow:hidden;">
+            
+            <!-- Resizable theory panel -->
+            <div id="graph-theory" 
+                style="width:250px;             /* initial width */
+                       min-width:150px; 
+                       max-width:100%; 
+                       overflow-y:auto; 
+                       padding:10px; 
+                       border-right:2px solid #ddd; 
+                       resize:horizontal; 
+                       height:100%;">
             </div>
-        `
-    }
+            
+            <!-- Graph panel -->
+            <div id="graph-visual" 
+                style="flex:1; 
+                       min-height:0; 
+                       position:relative; 
+                       overflow:hidden; 
+                       width:100%; 
+                       height:100%;">
+            </div>
+        </div>
+    `;
+}
 
     function print(graph) {
 
+        function _toColor(labelling) {
+                switch(labelling) {
+                    case "in" : return "#00ff00"
+                    case "out" : return "#ff0000"
+                    case "und" : return "#808080"
+                }
+            }
+
         function _printTheory(argumentList) {
 
-            function _format(descriptor) {
-                return '<div style="font-weight:bold; overflow:hidden;">' + 
+            function _format(descriptor, color) {
+                return '<div style="padding-left:20px;text-indent:-20px;color:' + color + '">' + 
                     descriptor + '</div>'
             }
 
-            document.querySelector("#graph-theory").innerHTML = argumentList
-                .reduce((a, b) => a + _format(b.descriptor), "")
+            const sortedArguments = argumentList.slice().sort((a, b) => {
+                if (a.descriptor < b.descriptor) return -1;
+                if (a.descriptor > b.descriptor) return 1;
+                return 0;
+            });
+
+            document.querySelector("#graph-theory").innerHTML = sortedArguments
+                .reduce((a, b) => a + _format(b.descriptor, _toColor(b.label)), "")
+                .replace(/'/g, "").replace(/:/g, "  :  ").replace(/,/g, ", ");
         }
 
         function _printGraph(argumentList, attacks) {
             
             function _toInt(identifier) {
                 return parseInt(identifier.substring(1))
-            }
-
-            function _toColor(labelling) {
-                switch(labelling) {
-                    case "in" : return "#00ff00"
-                    case "out" : return "#ff0000"
-                    case "und" : return "#808080"
-                }
             }
 
             const network = new vis.Network(document.querySelector("#graph-visual"), {
@@ -66,8 +94,12 @@ function GraphModule() {
                         to: _toInt(x.to),
                         arrows: "to"
                     }
-                }))
-            }, {})
+                })),
+            }, {
+                autoResize: true,
+                height: "100%",
+                width: "100%"
+            })
 
             network.fit()
         }
