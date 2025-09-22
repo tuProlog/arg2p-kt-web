@@ -1,6 +1,6 @@
 {
   "name": "@tuprolog/arg2p-playground",
-  "version": "0.11.2",
+  "version": "0.11.4",
   "description": "Arg2Prolog Web Playground",
   "main": "./app/control.mjs",
   "scripts": {
@@ -33,7 +33,7 @@
     "node-polyfill-webpack-plugin": "4.1.0"
   },
   "dependencies": {
-    "@tuprolog/arg2p": "0.11.3",
+    "@tuprolog/arg2p": "0.11.4",
     "vis-network": "latest",
     "sync-request": "latest"
   }
