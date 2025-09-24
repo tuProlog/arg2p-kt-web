@@ -43,7 +43,7 @@ let theoryEditor = monaco.editor.create(theoryField, {
 
 
 let queryEditor = monaco.editor.create(queryField, {
-    value: 'buildLabelSets',
+    value: 'arg2p::solve(-flies(X))',
     language: 'tuprolog',
     mscrollbar: {
 		vertical: 'hidden',
