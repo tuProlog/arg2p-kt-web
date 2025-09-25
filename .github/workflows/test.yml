@@ -2,6 +2,8 @@ name: Run Tests
 
 on:
   push:
+    branches:
+        - master
 
 jobs:
   test:
@@ -9,11 +11,13 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          token: { secrets.GITHUB_TOKEN }
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -21,10 +25,13 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          sed -i 's/return solverFactory(ModuleNames_instance\.r2z(true), \[ModuleNames_instance\.r2z(false)\]);/return require\("\.\/2p-solve-classic\.js"\)\.it\.unibo\.tuprolog\.solve\.classic\.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
+          sed -i '0,/return solverFactory(ModuleNames_instance\.[a-zA-Z0-9]\{3\}(true), \[ModuleNames_instance\.[a-zA-Z0-9]\{3\}(false)\]);/s//return require(".\/2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
       - name: Run tests
         run: |
           npm test
       - name: Build
         run: |
           npm run build
+      - name: Deploy
+        run: |
+          npm run deploy

@@ -3,7 +3,7 @@
 ## Install
 ```bash
   npm install
-  sed -i 's/return solverFactory(ModuleNames_instance\.l2w(true), \[ModuleNames_instance\.l2w(false)\]);/return require\("\.\/2p-solve-classic\.js"\)\.it\.unibo\.tuprolog\.solve\.classic\.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
+  sed -i '0,/return solverFactory(ModuleNames_instance\.[a-zA-Z0-9]\{3\}(true), \[ModuleNames_instance\.[a-zA-Z0-9]\{3\}(false)\]);/s//return require(".\/2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
 ```
 
 ## Usage
