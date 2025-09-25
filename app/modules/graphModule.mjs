@@ -50,8 +50,8 @@ function GraphModule() {
 
         function _toColor(labelling) {
                 switch(labelling) {
-                    case "in" : return "#00ff00"
-                    case "out" : return "#ff0000"
+                    case "in" : return "#008080"
+                    case "out" : return "#800000"
                     case "und" : return "#808080"
                 }
             }
