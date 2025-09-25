@@ -85,7 +85,10 @@ function GraphModule() {
                     return {
                         id: _toInt(x.id),
                         label: x.id,
-                        color: _toColor(x.label)
+                        color: _toColor(x.label),
+                        font: {
+                            color: "#ffffff",
+                        }
                     }
                 })),
                 edges: new vis.DataSet(attacks.map(x => {
