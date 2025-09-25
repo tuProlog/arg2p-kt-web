@@ -49,12 +49,16 @@ function GraphModule() {
     function print(graph) {
 
         function _toColor(labelling) {
-                switch(labelling) {
-                    case "in" : return "#008080"
-                    case "out" : return "#800000"
-                    case "und" : return "#808080"
-                }
+            switch(labelling) {
+                case "in" : return "#008080"
+                case "out" : return "#800000"
+                case "und" : return "#808080"
             }
+        }
+
+        function _toInt(identifier) {
+            return parseInt(identifier.substring(1))
+        }
 
         function _printTheory(argumentList) {
 
@@ -64,9 +68,8 @@ function GraphModule() {
             }
 
             const sortedArguments = argumentList.slice().sort((a, b) => {
-                if (a.descriptor < b.descriptor) return -1;
-                if (a.descriptor > b.descriptor) return 1;
-                return 0;
+                if (_toInt(a.id) < _toInt(b.id)) return -1;
+                return 1;
             });
 
             document.querySelector("#graph-theory").innerHTML = sortedArguments
@@ -75,11 +78,6 @@ function GraphModule() {
         }
 
         function _printGraph(argumentList, attacks) {
-            
-            function _toInt(identifier) {
-                return parseInt(identifier.substring(1))
-            }
-
             const network = new vis.Network(document.querySelector("#graph-visual"), {
                 nodes: new vis.DataSet(argumentList.map(x => {
                     return {
