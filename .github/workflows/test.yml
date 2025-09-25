@@ -35,5 +35,5 @@ jobs:
       - name: Deploy
         run: |
           git config --global user.email "g.pisano@unibo.it"
-          git config --global user.name "Giuseppe Pisano"
+          git config --global user.name "Gilbocc"
           npm run deploy
