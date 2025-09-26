@@ -35,5 +35,6 @@ jobs:
           npm run build
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
+        if: github.ref_name == 'master'
         with:
           folder: prodDist
