@@ -14,7 +14,7 @@ function FlagsModule() {
             value: [
                 'graphBuildMode(standard_af).',
                 'statementLabellingMode(statement).',
-                'argumentLabellingMode(grounded_hash).',
+                'argumentLabellingMode(grounded).',
                 'orderingPrinciple(last).',
                 'orderingComparator(elitist).',
                 'graphExtension(standardPref).',

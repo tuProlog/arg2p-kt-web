@@ -105,7 +105,7 @@ describe('Solve', function () {
     const baseFlags = `
       graphBuildMode(standard_af).
       statementLabellingMode(statement).
-      argumentLabellingMode(grounded_hash).
+      argumentLabellingMode(grounded).
       orderingPrinciple(last).
       orderingComparator(elitist).
       graphExtension(standardPref).
