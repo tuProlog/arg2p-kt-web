@@ -30,16 +30,10 @@ jobs:
           npm test
       - name: Build
         run: |
-          npm run build     
-  deploy:
-    runs-on: ubuntu-24.04
-    needs:
-      - test
-    if: github.ref_name == 'master'
-    steps:
-      - name: Upload
-        uses: JamesIves/github-pages-deploy-action@v4
+          npm run build
+      - name: Deploy
         if: github.ref_name == 'master'
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: prodDist
   success:
@@ -54,4 +48,4 @@ jobs:
     steps:
       - name: Verify that there were no failures
         run: ${{ !contains(join(needs.*.result, ','), 'failure') }}
-          
+        
