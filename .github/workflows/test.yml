@@ -6,11 +6,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
+  
     strategy:
       matrix:
         node-version: [22]
-
+  
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -30,9 +30,28 @@ jobs:
           npm test
       - name: Build
         run: |
-          npm run build
-      - name: Deploy
+          npm run build     
+  deploy:
+    runs-on: ubuntu-24.04
+    needs:
+      - test
+    if: github.ref_name == 'master'
+    steps:
+      - name: Upload
         uses: JamesIves/github-pages-deploy-action@v4
         if: github.ref_name == 'master'
         with:
           folder: prodDist
+  success:
+    runs-on: ubuntu-24.04
+    needs:
+      - test
+    if: >-
+      always() && (
+        contains(join(needs.*.result, ','), 'failure')
+        || !contains(join(needs.*.result, ','), 'cancelled')
+      )
+    steps:
+      - name: Verify that there were no failures
+        run: ${{ !contains(join(needs.*.result, ','), 'failure') }}
+          
