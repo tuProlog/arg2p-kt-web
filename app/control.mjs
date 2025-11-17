@@ -20,13 +20,13 @@ const examples = {
 
 % r0: If Bush shoots, Bush kills.
 r_0 : bu_sh => bu_ki.
-% r1: If Dlugash shoots, Bush kills.
+% r1: If Dlugash shoots, Dlugash kills.
 r_1 : dl_sh => du_ki.
 % r2: If Bush kills, Geller dies.
 r_2 : bu_ki => ge_di.
 % r3: If Dlugash kills, Geller dies.
 r_3 : du_ki => ge_di.
-% r4: If Bush kills, Dlugash does not kill when shooting
+% r4: If Bush kills, Dlugash does not kill
 r_4 : bu_ki => -r_1.
 
 % K
@@ -37,18 +37,18 @@ f_1 :=> dl_sh.
 `,
 1 : `% R
 
-% r0: If drives does not press the brakes, accident happens.
+% r0: If driver does not use the brake, accident happens.
 r_0 : -dr_pu => ac_ha.
-% r1: If brakes malfunction, brakes fail.
+% r1: If brake malfunctions, brake fails.
 r_1 : br_ma => br_fa.
-% r2: If brakes fail, accident happens.
+% r2: If brake fail, accident happens.
 r_2 : br_fa => ac_ha.
-% r3: If driver does not press the brakes, the malfunction does not make the brakes fail
+% r3: If driver does not use the brake, the brake cannot fail
 r_3 : -dr_pu => -r_1.
 
 % K
 
-% brakes malfunction, drives does not press the brakes.
+% brake malfunction, driver does not use the brake.
 f_1 :=> br_ma.
 f_2 :=> -dr_pu.
 `,
