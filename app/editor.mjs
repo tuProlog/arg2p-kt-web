@@ -5,61 +5,68 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 monaco.languages.register({ id: 'tuprolog' })
 
 monaco.languages.setMonarchTokensProvider('tuprolog', {
+    // operators
+    symbols: /[=><!~?:&|+\-*\/\^%]+/,
 
-	symbols: /[=><!~?:&|+\-*\/\^%]+/,
+    // escapes inside strings or chars
+    escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4})/,
 
-	escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+    tokenizer: {
+        root: [
+            // --- COMMENTS ---
+            [/%.*/, 'comment'],          // Prolog-style line comment
+            [/\/\/.*/, 'comment'],       // C-style single-line comment
 
-	tokenizer: {
-		root: [
-			// functors
-			[/([a-z][a-zA-Z_0-9]*)\s*(?=\()/, 'type.identifier'],
+            // --- FUNCTORS (identifier followed by '(') ---
+            [/([a-z][a-zA-Z_0-9]*)\s*(?=\()/, 'type.identifier'],
 
-			// whitespace
-			{ include: '@whitespace' },
+			// atoms: lowercase identifiers, possibly with underscores or digits
+			[/[a-z][a-zA-Z_0-9]*/, 'atom'],
 
-			// // delimiters and operators
-			// [/[{}()\[\]]/, '@brackets'],
-			// [/((?!\/\*)[+*\/^<>=~:.?@#$&\\-]+)|!|;|,|rem|mod|is/, 'type.operators'],
+            // --- WHITESPACE ---
+            { include: '@whitespace' },
 
-			// // numbers
-			// [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
-			// [/0[xX][0-9a-fA-F]+/, 'number.hex'],
-			// [/0[oO][0-7]+/, 'number.oct'],
-			// [/0[bB][0-1]+/, 'number.bin'],
-			// [/\d+/, 'number'],
+            // --- DELIMITERS ---
+            [/[;,.]/, 'delimiter'],
 
-			[/[;,.]/, 'delimiter'],
+            // --- STRINGS ---
+            [/"([^"\\]|\\.)*$/, 'string.invalid'],  
+            [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
 
-			// strings
-			[/"([^"\\]|\\.)*$/, 'string.invalid'],  // non-teminated string
-			[/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+            // --- CHARACTER LITERALS ---
+            // normal char: 'a'
+            [/'[^\\']'/, 'string'],
+            // escaped char: '\n'
+            [/'(@escapes)'/, ['string', 'string.escape', 'string']],
+            // everything else starting with '
+            [/'/, 'string.invalid'],
 
-			// characters
-			[/'[^\\']'/, 'string'],
-			[/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
-			[/'/, 'string.invalid']
-		],
+            // --- OPERATORS ---
+            [/@symbols/, 'operator'],
 
-		comment: [
-			[/[^\/*]+/, 'comment'],
-			[/[\/*]/, 'comment'],
-			[/\/\/.*$/, 'comment'],
-			[/%.*$/, 'comment']
-		],
+            // --- NUMBERS ---
+            [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+            [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+            [/0[oO][0-7]+/, 'number.oct'],
+            [/0[bB][0-1]+/, 'number.bin'],
+            [/\d+/, 'number'],
+        ],
 
-		string: [
-			[/[^\\"]+/, 'string'],
-			[/@escapes/, 'string.escape'],
-			[/\\./, 'string.escape.invalid'],
-			[/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
-		],
+        // --- STRING STATE ---
+        string: [
+            [/[^\\"]+/, 'string'],
+            [/(@escapes)/, 'string.escape'],
+            [/\\./, 'string.escape.invalid'],
+            [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+        ],
 
-		whitespace: [
-			[/[ \t\r\n]+/, 'white'],
-		]
-	},
-})
+        // --- WHITESPACE STATE ---
+        whitespace: [
+            [/[ \t\r\n]+/, 'white']
+        ],
+    }
+});
+
 
 self.MonacoEnvironment = {
 	getWorkerUrl: function (moduleId, label) {
@@ -73,7 +80,12 @@ var htmlCode = "<html><!--long linelong linelong linelong linelong linelong line
 monaco.editor.defineTheme('myTheme', {
     base: 'vs',
     inherit: true,
-    rules: [{ background: 'EDF9FA' }],
+    rules: [
+		{ token: 'atom', foreground: 'FF0000' },
+		{ token: 'number', foreground: 'FF0000' },
+		{ background: 'EDF9FA' },
+		{ token: 'comment', foreground: 'FFA500' } 
+	],
     colors: {
         'editor.lineHighlightBackground': '#00000000',
         'editor.lineHighlightBorder': '#00000000',
