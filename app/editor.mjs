@@ -81,10 +81,10 @@ monaco.editor.defineTheme('myTheme', {
     base: 'vs',
     inherit: true,
     rules: [
-		{ token: 'atom', foreground: 'FF0000' },
-		{ token: 'number', foreground: 'FF0000' },
+		{ token: 'atom', foreground: '800000' },
+		{ token: 'number', foreground: '800000' },
 		{ background: 'EDF9FA' },
-		{ token: 'comment', foreground: 'FFA500' } 
+		{ token: 'comment', foreground: '808080' } 
 	],
     colors: {
         'editor.lineHighlightBackground': '#00000000',
