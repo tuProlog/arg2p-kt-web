@@ -15,19 +15,58 @@ const outputConsole = document.querySelector("#console");
 const graphContainer = document.querySelector("#graph");
 const flagsContainer = document.querySelector("#flags");
 
+const examples = {
+0 : `% R
+
+% r0: If Bush shoots, Bush kills.
+r_0 : bu_sh => bu_ki.
+% r1: If Dlugash shoots, Bush kills.
+r_1 : dl_sh => du_ki.
+% r2: If Bush kills, Geller dies.
+r_2 : bu_ki => ge_di.
+% r3: If Dlugash kills, Geller dies.
+r_3 : du_ki => ge_di.
+% r4: If Bush kills, Dlugash does not kill when shooting
+r_4 : bu_ki => -r_1.
+
+% K
+
+% Both Bush and Dlugash shoot.
+f_1 :=> bu_sh.
+f_1 :=> dl_sh.
+`,
+1 : `% R
+
+% r0: If drives does not press the brakes, accident happens.
+r_0 : -dr_pu => ac_ha.
+% r1: If brakes malfunction, brakes fail.
+r_1 : br_ma => br_fa.
+% r2: If brakes fail, accident happens.
+r_2 : br_fa => ac_ha.
+% r3: If driver does not press the brakes, the malfunction does not make the brakes fail
+r_3 : -dr_pu => -r_1.
+
+% K
+
+% brakes malfunction, drives does not press the brakes.
+f_1 :=> br_ma.
+f_2 :=> -dr_pu.
+`,
+2 : `d1(X) : bird(X) => flies(X).
+d2(X) : penguin(X) => bird(X).
+d3(X) : sparrow(X) => bird(X).
+
+p1(X) : penguin(X) => -flies(X).
+p2(X) : penguin(X) => -d1(X).
+
+f1 :=> penguin(tweety).
+f2 :=> sparrow(jack).
+` 
+ }
+
 
 let theoryEditor = monaco.editor.create(theoryField, {
-    value: [
-        'd1(X) : bird(X) => flies(X).',
-        'd2(X) : penguin(X) => bird(X).',
-        'd3(X) : sparrow(X) => bird(X).',
-        '',
-        'p1(X) : penguin(X) => -flies(X).',
-        'p2(X) : penguin(X) => -d1(X).',
-        '',
-        'f1 :=> penguin(tweety).',
-        'f2 :=> sparrow(jack).'
-    ].join('\n'),
+    value: examples[2],
     language: 'tuprolog',
     scrollbar: {
 		vertical: 'hidden',
@@ -43,7 +82,7 @@ let theoryEditor = monaco.editor.create(theoryField, {
 
 
 let queryEditor = monaco.editor.create(queryField, {
-    value: 'arg2p::solve(-flies(X))',
+    value: 'arg2p::solve',
     language: 'tuprolog',
     mscrollbar: {
 		vertical: 'hidden',
@@ -99,6 +138,14 @@ function setListeners(solveAction) {
         .addEventListener("change", e =>
             readFile(e.target.files[0], text => theoryEditor.setValue(text))
         );
+    
+
+    document.querySelectorAll(".example").forEach(link => {
+        link.addEventListener("click", () => {
+            theoryEditor.setValue(examples[link.dataset.value])
+            queryEditor.setValue("arg2p::solve")
+        });
+    });  
 }
 
 function readFile(file, cb) {

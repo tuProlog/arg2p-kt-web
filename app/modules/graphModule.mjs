@@ -74,7 +74,7 @@ function GraphModule() {
 
             document.querySelector("#graph-theory").innerHTML = sortedArguments
                 .reduce((a, b) => a + _format(b.descriptor, _toColor(b.label)), "")
-                .replace(/'/g, "").replace(/:/g, "  :  ").replace(/,/g, ", ");
+                //.replace(/'/g, "").replace(/:/g, "  :  ").replace(/,/g, ", ");
         }
 
         function _printGraph(argumentList, attacks) {
