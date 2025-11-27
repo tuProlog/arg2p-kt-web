@@ -78,6 +78,7 @@ let theoryEditor = monaco.editor.create(theoryField, {
     overviewRulerBorder: false,
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
+    automaticLayout: true
 });
 
 

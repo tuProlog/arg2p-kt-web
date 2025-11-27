@@ -24,7 +24,6 @@ function GraphModule() {
             <!-- Resizable theory panel -->
             <div id="graph-theory" 
                 style="width:250px;             /* initial width */
-                       min-width:150px; 
                        max-width:100%; 
                        overflow-y:auto; 
                        padding:10px; 
