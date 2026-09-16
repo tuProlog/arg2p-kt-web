@@ -1,4 +1,5 @@
 import * as vis from "vis-network/standalone/esm/vis-network.js"
+import { labelColor } from './palette.mjs';
 
 function GraphModule() {
 
@@ -47,14 +48,6 @@ function GraphModule() {
 
     function print(graph) {
 
-        function _toColor(labelling) {
-            switch(labelling) {
-                case "in" : return "#008080"
-                case "out" : return "#800000"
-                case "und" : return "#808080"
-            }
-        }
-
         function _toInt(identifier) {
             return parseInt(identifier.substring(1))
         }
@@ -72,7 +65,7 @@ function GraphModule() {
             });
 
             document.querySelector("#graph-theory").innerHTML = sortedArguments
-                .reduce((a, b) => a + _format(b.descriptor, _toColor(b.label)), "")
+                .reduce((a, b) => a + _format(b.descriptor, labelColor(b.label)), "")
                 .replace(/'/g, "").replace(/:/g, "  :  ").replace(/,/g, ", ");
         }
 
@@ -82,7 +75,7 @@ function GraphModule() {
                     return {
                         id: _toInt(x.id),
                         label: x.id,
-                        color: _toColor(x.label),
+                        color: labelColor(x.label),
                         font: {
                             color: "#ffffff",
                         }

@@ -21,7 +21,7 @@
     </div>
     <nav class="navbar navbar-expand-lg fixed-top navbar-light bg-light">
         <div class="d-flex flex-row justify-content-between align-items-center" style="width: 100%;">
-            <div class="d-flex flex-row">
+            <div class="d-flex flex-row align-items-center">
                 <a class="navbar-brand" href="https://legalmachinelab.unibo.it/arg2p/">Arg2p Web Playground</a>
                 <a class="nav-link" href="https://tuprolog.github.io/arg2p-kt/">Documentation</a>
                 <a class="nav-link" href="https://github.com/tuProlog/arg2p-kt">Project</a>
@@ -30,10 +30,20 @@
                         Examples
                     </a>
                     <div class="dropdown-menu" aria-labelledby="dropdownMenuLink">
-                        <a class="dropdown-item example" href="#" data-value="2">Tweety</a>
-                        <a class="dropdown-item example" href="#" data-value="0">Bush & Dlugash</a>
-                        <a class="dropdown-item example" href="#" data-value="1">Car Accident</a>
+                        <h6 class="dropdown-header">Structured</h6>
+                        <a class="dropdown-item example" href="#" data-example="tweety">Tweety</a>
+                        <a class="dropdown-item example" href="#" data-example="bush">Bush &amp; Dlugash</a>
+                        <a class="dropdown-item example" href="#" data-example="car">Car Accident</a>
+                        <div class="dropdown-divider"></div>
+                        <h6 class="dropdown-header">Abstract</h6>
+                        <a class="dropdown-item example" href="#" data-example="evenCycle">Even Cycle</a>
+                        <a class="dropdown-item example" href="#" data-example="oddCycle">Odd Cycle</a>
                     </div>
+                </div>
+                <a class="nav-link share" href="#" title="Copy a link that restores the current theory, query and flags">Share</a>
+                <div class="mode-selector btn-group btn-group-sm" role="group" aria-label="Playground mode">
+                    <a class="btn btn-outline-secondary mode-switch" href="#" data-mode="structured">Structured</a>
+                    <a class="btn btn-outline-secondary mode-switch" href="#" data-mode="abstract">Abstract</a>
                 </div>
             </div>
             <div>VERSION</div>
@@ -41,7 +51,7 @@
     </nav>
     <div class="d-flex flex-column" style="height: 100%; padding-top: 3%;">
         <div class="d-flex flex-row" style="height: 100%;">
-            <div class="d-flex flex-column" style="width:auto;
+            <div id="input-panel" class="flex-column" style="width:auto;
                                     max-width:100%; 
                                     overflow-y:hidden; 
                                     padding:10px; 
@@ -61,7 +71,19 @@
                                     width:100%; 
                                     height:100%;">
                 <div class="d-flex flex-column result" style="flex-basis: 15%;">
-                    <label for="query">Query : ?-</label>
+                    <div class="d-flex flex-row justify-content-between align-items-end">
+                        <label for="query"><span class="structured-only">Query : ?-</span><span class="abstract-only">Query (generated from the graph) : ?-</span></label>
+                        <label class="abstract-only semantics-picker" for="semantics">Semantics :
+                            <select id="semantics">
+                                <option value="grounded">Grounded</option>
+                                <option value="complete">Complete</option>
+                                <option value="preferred">Preferred</option>
+                                <option value="stable">Stable</option>
+                                <option value="ideal">Ideal</option>
+                                <option value="bp_grounded">BP Grounded</option>
+                            </select>
+                        </label>
+                    </div>
                     <div id="query" name="query"></div>
                     <button class="solve">RUN</button>
                 </div>
@@ -83,12 +105,24 @@
                                     height:100%;">
                                     <div class="output"></div>
                                 </div>
-                                <div id="graph" style="flex:1; 
+                                <div id="graph" class="structured-only" style="flex:1; 
                                     min-height:0; 
                                     position:relative; 
                                     overflow:hidden; 
                                     width:100%; 
                                     height:100%;">
+                                </div>
+                                <div id="abstract-panel" class="abstract-only flex-column" style="flex:1;
+                                    min-width:0;
+                                    min-height:0;
+                                    padding:10px;
+                                    height:100%;">
+                                    <div id="abstract-editor"></div>
+                                    <p class="abstract-hint">
+                                        Use the toolbar to add arguments and attacks, and double click an
+                                        argument to rename it. Hit <b>RUN</b> to compute the labellings:
+                                        nodes are recoloured with the one of the solution shown.
+                                    </p>
                                 </div>
                             </div>
                         </div>

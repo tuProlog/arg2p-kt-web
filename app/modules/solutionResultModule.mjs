@@ -19,13 +19,15 @@ function SolutionResultModule() {
     }
 
 
-    function printSolution(iterator, query, beforeNext, afterNext) {
+    function printSolution(iterator, query, beforeNext, afterNext, options) {
+        const settings = options || {};
+        const run = { accepted: 0 };
         const solutionContainer = document.createElement("div");
         solutionContainer.className = "solutionResultWrapper";
         const list = document.createElement("ul");
         const nextButton = document.createElement("button");
         nextButton.innerText = "Next";
-        nextButton.addEventListener('click', () => printNext(iterator, list, nextButton, beforeNext, afterNext));
+        nextButton.addEventListener('click', () => printNext(iterator, list, nextButton, beforeNext, afterNext, settings, run));
         const deleteButton = document.createElement("button");
         deleteButton.innerText = "X";
         deleteButton.addEventListener('click', () => solutionContainer.remove());
@@ -38,16 +40,20 @@ function SolutionResultModule() {
         solutionContainer.appendChild(list);
         parentHtml.appendChild(solutionContainer);
         queryCounter++;
-        printNext(iterator, list, nextButton, beforeNext, afterNext)
+        printNext(iterator, list, nextButton, beforeNext, afterNext, settings, run)
         return list;
     }
 
 
-    function addDomSolution(sol, solutionList) {
+    function addDomSolution(sol, solutionList, settings, run) {
+        // Once a solution has been accepted, a trailing `no` only marks the end
+        // of the enumeration. A leading one still carries meaning -- there is no
+        // extension under the selected semantics -- so it is never hidden.
+        if (settings.hideExhaustedNo && sol.res == "no" && run.accepted > 0) return;
         let element = document.createElement("li");
         if (sol.res == "yes") {
             element = printPrettySolutions(sol);
-
+            run.accepted++;
         } else if (sol.res == "no") {
             element.innerText = "No";
         } else {
@@ -73,16 +79,16 @@ function SolutionResultModule() {
         return element
     }
 
-    function printNext(iterator, list, nextButton, beforeNext, afterNext) {
+    function printNext(iterator, list, nextButton, beforeNext, afterNext, settings, run) {
         if (iterator.hasNext()) {
             beforeNext()
             new Promise((resolve, reject) => {
                 setTimeout(function() {
                     let solution = iterator.next()
-                    addDomSolution(solution, list);
+                    addDomSolution(solution, list, settings, run);
                     resolve(solution)
                 }, 0)
-            }).then(sol => afterNext(sol.graph))
+            }).then(sol => afterNext(sol))
         }
 
         nextButton.disabled = !iterator.hasNext();

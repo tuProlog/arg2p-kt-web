@@ -91,3 +91,97 @@ body {
 a {
   color: black;
 }
+
+/***************
+* MODES
+***************/
+
+/* Only the panels belonging to the active mode are laid out. The body class is
+   set by the controller, so before startup nothing mode specific is shown. */
+.structured-only,
+.abstract-only {
+  display: none;
+}
+
+body.mode-structured .structured-only,
+body.mode-abstract .abstract-only {
+  display: flex;
+}
+
+body.mode-structured label span.structured-only,
+body.mode-abstract label span.abstract-only {
+  display: inline;
+}
+
+.mode-selector {
+  margin-left: 10px;
+}
+
+.mode-selector .btn.active {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+/* Abstract mode has no theory, so the whole left hand column goes away and the
+   graph gets the width the theory editor used to take. Bootstrap's `d-flex` is
+   `display: flex !important`, so the panel cannot use it and be hidden here. */
+#input-panel {
+  display: flex;
+}
+
+body.mode-abstract #input-panel {
+  display: none;
+}
+
+/* `.structured-only` turns this into a flex item, but the graph panel owns its
+   own internal layout. */
+body.mode-structured #graph {
+  display: block;
+}
+
+/***************
+* ABSTRACT MODE
+***************/
+
+#abstract-editor {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  position: relative;
+}
+
+/* Floated over the node being renamed, centred on it. */
+.abstract-rename {
+  position: absolute;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+  width: 140px;
+  padding: 2px 6px;
+  border: 2px solid #2b7ce9;
+  border-radius: 4px;
+  background: #fff;
+  font-family: Roboto;
+  font-size: 14px;
+  text-align: center;
+}
+
+.abstract-rename.invalid {
+  border-color: #800000;
+  background: #fdf0f0;
+}
+
+.abstract-hint {
+  font-size: 12px;
+  color: #808080;
+  margin: 10px 0 0 0;
+}
+
+.semantics-picker {
+  font-size: 14px;
+}
+
+.semantics-picker select {
+  margin-left: 5px;
+}
