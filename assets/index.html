@@ -75,12 +75,29 @@
                         <label for="query"><span class="structured-only">Query : ?-</span><span class="abstract-only">Query (generated from the graph) : ?-</span></label>
                         <label class="abstract-only semantics-picker" for="semantics">Semantics :
                             <select id="semantics">
-                                <option value="grounded">Grounded</option>
-                                <option value="complete">Complete</option>
-                                <option value="preferred">Preferred</option>
-                                <option value="stable">Stable</option>
-                                <option value="ideal">Ideal</option>
-                                <option value="bp_grounded">BP Grounded</option>
+                                <optgroup label="Admissibility based">
+                                    <option value="grounded">Grounded</option>
+                                    <option value="complete">Complete</option>
+                                    <option value="preferred">Preferred</option>
+                                    <option value="stable">Stable</option>
+                                    <option value="semistable">Semi-stable</option>
+                                    <option value="ideal">Ideal</option>
+                                    <option value="eager">Eager</option>
+                                    <option value="admissible">Admissible</option>
+                                    <option value="stronglyadmissible">Strongly admissible</option>
+                                </optgroup>
+                                <optgroup label="Conflict-free based">
+                                    <option value="conflictfree">Conflict-free</option>
+                                    <option value="naive">Naive</option>
+                                    <option value="stage">Stage</option>
+                                    <option value="stage2">Stage2</option>
+                                    <option value="cf2">CF2</option>
+                                </optgroup>
+                                <optgroup label="Burden of proof">
+                                    <option value="bp_grounded">BP grounded</option>
+                                    <option value="bp_grounded_complete">BP grounded (complete)</option>
+                                    <option value="bp_grounded_partial">BP grounded (partial)</option>
+                                </optgroup>
                             </select>
                         </label>
                     </div>
