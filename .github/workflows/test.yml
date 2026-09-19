@@ -37,7 +37,7 @@ jobs:
         with:
           folder: prodDist
   success:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - test
     if: >-
