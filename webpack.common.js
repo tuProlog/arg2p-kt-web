@@ -6,7 +6,7 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 module.exports = {
 	entry: {
 		"app": './app/control.mjs',
-		"editor.worker": 'monaco-editor/esm/vs/editor/editor.worker.js',
+		"editor.worker": 'monaco-editor/editor/editor.worker.js',
 		"arg2p": './app/common.js'
 	},
 	output: {

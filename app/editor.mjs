@@ -1,6 +1,6 @@
-import 'monaco-editor/esm/vs/editor/browser/coreCommands.js';
-import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController.js';
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
+import 'monaco-editor/editor/browser/coreCommands.js';
+import 'monaco-editor/editor/contrib/find/browser/findController.js';
+import * as monaco from 'monaco-editor/editor/editor.api.js';
 
 monaco.languages.register({ id: 'tuprolog' })
 
