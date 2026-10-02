@@ -24,7 +24,8 @@ jobs:
         run: |
           npm install
           sed -i "s/VERSION/$(grep '"@tuprolog/arg2p"' package.json | sed -E 's/.*: *"([^"]+)".*/\1/')/g" assets/index.html
-          sed -i '0,/return solverFactory(ModuleNames_instance\.[a-zA-Z0-9]\{3\}(true), \[ModuleNames_instance\.[a-zA-Z0-9]\{3\}(false)\]);/s//return require(".\/2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
+          sed -i '0,/return solverFactory(ModuleNames_instance\.[a-zA-Z0-9_$]\+(true), \[ModuleNames_instance\.[a-zA-Z0-9_$]\+(false)\]);/s//return require(".\/2p-solve-classic.js").it.unibo.tuprolog.solve.classic.ClassicSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
+          grep -q 'require("./2p-solve-classic.js")' node_modules/@tuprolog/arg2p/2p-solve.js || { echo "::error::Classic solver patch did not apply to 2p-solve.js"; exit 1; }
       - name: Run tests
         run: |
           npm test
