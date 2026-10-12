@@ -13,8 +13,8 @@
  *
  * A dynamic, browser-based visualization library.
  *
- * @version 10.0.2
- * @date    2025-09-15T17:48:13.838Z
+ * @version 10.1.2
+ * @date    2026-08-19T16:52:18.397Z
  *
  * @copyright (c) 2011-2017 Almende B.V, http://almende.com
  * @copyright (c) 2017-2019 visjs contributors, https://github.com/visjs
