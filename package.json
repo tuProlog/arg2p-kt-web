@@ -33,7 +33,7 @@
     "webpack-merge": "6.0.1"
   },
   "dependencies": {
-    "@tuprolog/arg2p": "0.16.7",
+    "@tuprolog/arg2p": "0.16.8",
     "sync-request": "latest",
     "vis-network": "latest"
   }
