@@ -1,4 +1,3 @@
-import '../assets/style.css';
 import { monaco } from './editor.mjs';
 
 import * as consoleModule from './modules/consoleModule.mjs';
@@ -19,6 +18,7 @@ const LABELLING_FLAG = 'argumentLabellingMode';
 const theoryField = document.querySelector("#theory");
 const queryField = document.querySelector("#query");
 const solutionsList = document.querySelector("#solutions");
+const nextButton = document.querySelector("button.next");
 
 const outputConsole = document.querySelector("#console");
 const graphContainer = document.querySelector("#graph");
@@ -47,11 +47,15 @@ let theoryEditor = monaco.editor.create(theoryField, {
 });
 
 
+// Queries are usually a single line, so the box looks like a text field and
+// grows with its content only up to a few lines.
+const QUERY_MAX_HEIGHT = 96;
+
 let queryEditor = monaco.editor.create(queryField, {
     value: urlState.query !== null ? urlState.query : DEFAULT_QUERY,
     language: 'tuprolog',
-    mscrollbar: {
-		vertical: 'hidden',
+    scrollbar: {
+		vertical: 'auto',
 		horizontal: 'hidden'
 	},
     minimap: {
@@ -60,9 +64,24 @@ let queryEditor = monaco.editor.create(queryField, {
     overviewRulerBorder: false,
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
-    lineNumbers: false,
+    lineNumbers: 'off',
+    glyphMargin: false,
+    folding: false,
+    lineDecorationsWidth: 8,
+    renderLineHighlight: 'none',
+    scrollBeyondLastLine: false,
+    wordWrap: 'on',
+    // Matches the height of the RUN button next to it.
+    padding: { top: 9, bottom: 9 },
     automaticLayout: true
 });
+
+function fitQueryHeight() {
+    queryField.style.height = `${Math.min(QUERY_MAX_HEIGHT, queryEditor.getContentHeight())}px`;
+}
+
+queryEditor.onDidContentSizeChange(fitQueryHeight);
+fitQueryHeight();
 
 
 function startup() {
@@ -124,7 +143,8 @@ function startup() {
         // The mode is captured here: switching it while solutions are still being
         // enumerated must not change where the pending ones are rendered.
         const abstract = mode === ABSTRACT;
-        const resultManager = solutionResultModule.default.init(solutionsList);
+        // Only the latest query is kept: a new run replaces the previous result.
+        const resultManager = solutionResultModule.default.init(solutionsList, nextButton);
         const consoleManager = consoleModule.default.init(outputConsole);
         // Abstract mode draws the labelling onto the editable canvas instead.
         const graphManager = abstract ? null : graphModule.default.init(graphContainer);
@@ -138,14 +158,14 @@ function startup() {
         const queryText = abstract ? abstractManager.buildQuery() : queryEditor.getValue();
         if (abstract) queryEditor.setValue(queryText);
 
-        const { i, query } = queryService.default
+        const { i, query, result } = queryService.default
             .solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
 
         resultManager.printSolution(i, query, () => {
             document.querySelector(".overlay").style.display = "block"
         }, solution => {
             document.querySelector(".overlay").style.display = "none"
-            if (graphManager !== null) graphManager.printGraph(solution.graph)
+            if (graphManager !== null) graphManager.showSolution(solution, result)
             // A failed solution carries the graph left over from the last attempt,
             // so the canvas is only recoloured on an actual labelling.
             else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
@@ -186,9 +206,13 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
 
     document
         .querySelector("#inputFile")
-        .addEventListener("change", e =>
-            readFile(e.target.files[0], text => theoryEditor.setValue(text))
-        );
+        .addEventListener("change", e => {
+            const file = e.target.files[0];
+            if (file === undefined) return;
+            readFile(file, text => theoryEditor.setValue(text));
+            // Cleared so that picking the same file again reloads it.
+            e.target.value = "";
+        });
 
     document.querySelectorAll(".mode-switch").forEach(link => {
         link.addEventListener("click", e => {
@@ -201,6 +225,7 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
         link.addEventListener("click", e => {
             e.preventDefault();
             applyExample(examples[link.dataset.example]);
+            closeMenu();
         });
     });
 
@@ -209,8 +234,15 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
 
     document.querySelector(".share").addEventListener("click", e => {
         e.preventDefault();
+        closeMenu();
         share(urlParamsService.shareUrl(currentState()));
     });
+}
+
+// On small screens the navbar links live in a collapsible menu that would
+// otherwise stay open over the page after picking an entry.
+function closeMenu() {
+    if (window.jQuery !== undefined) window.jQuery("#navbar-menu").collapse("hide");
 }
 
 function share(url) {

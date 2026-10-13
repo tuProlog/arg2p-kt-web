@@ -1,50 +1,323 @@
+/***************
+* PAGE LAYOUT
+***************/
+
+:root {
+  --navbar-height: 56px;
+  --panel-border: 2px solid #ddd;
+}
+
 html {
-  height: 100vh;
+  height: 100%;
   padding: 0;
 }
 
+/* On wide screens the playground is a fixed, full window app: every panel
+   scrolls on its own. `dvh` keeps mobile browser bars out of the count. */
 body {
   font-family: Roboto;
   overflow: hidden;
   height: 100vh;
-  padding: 5vh;
+  height: 100dvh;
+  padding: var(--navbar-height) 0 0 0;
+  display: flex;
+  flex-direction: column;
 }
 
-#theory, #query {
+.navbar .mode-selector {
+  margin-left: auto;
+}
+
+.navbar .navbar-toggler {
+  margin-left: 10px;
+}
+
+.navbar .version {
+  margin-right: 12px;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  padding: 10px 2vw 2vh 2vw;
+}
+
+#input-panel {
+  flex-direction: column;
+  width: 28%;
+  min-width: 260px;
+  max-width: 80%;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  border-right: var(--panel-border);
+  resize: horizontal;
+}
+
+.result-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-left: 2%;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.panel-header label {
+  margin-bottom: 0;
+}
+
+.query-panel {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+.query-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  column-gap: 10px;
+}
+
+.query-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Height is set from control.mjs to fit the content. */
+#query {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.query-row .solve,
+.query-row .next {
+  flex: none;
+  min-width: 70px;
+}
+
+/* Nothing to show besides the query itself (no run yet, or a solution with
+   no variables): the graph gets the whole width. */
+#solutions.trivial {
+  display: none;
+}
+
+/* And the other way round: no argument graph, the solutions take the room. */
+body.mode-structured #graph.empty {
+  display: none;
+}
+
+.solutions-layout:has(#graph.empty) #solutions {
+  flex: 1;
+  border-right: none;
+  resize: none;
+}
+
+#info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+}
+
+.tab-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.tab-pane {
+  height: 100%;
+}
+
+#con-tab {
+  overflow: auto;
+}
+
+#console {
+  padding: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+#flags {
+  height: 100%;
+}
+
+.solutions-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+#solutions {
+  width: 300px;
+  max-width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+  border-right: var(--panel-border);
+  resize: horizontal;
+}
+
+#graph {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+#abstract-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  height: 100%;
+}
+
+#theory {
   width : 100%;
   border-radius: 10px;
   white-space: pre-wrap;
   flex-grow: 1;
-}
-
-#inputFile {
-  margin: 10px 0;
+  min-height: 0;
 }
 
 /***************
 * SOLUTION TAB
 ***************/
-.solutionResultWrapper{
-  border: 1px solid #EEE;
-  border-radius: 5px;
-  padding: 5px;
-  flex: 1 0 33%;
+.solutionResultWrapper {
+  font-size: 14px;
 }
 
-.solutionResultWrapper button {
-  margin: 10px;
+.solution-query {
+  font-family: monospace;
+  font-size: 13px;
+  color: #555;
+  padding: 0 2px 8px 2px;
+  word-break: break-word;
 }
 
-#solutions .solutionResultWrapper li.halt{
-  background-color: rgba(255, 0, 0, 0.2);
+.solution-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-#solutions .solutionResultWrapper li.no{
-  background-color: rgba(255, 255, 0, 0.2);
+.solution {
+  border: 1px solid #e3e3e3;
+  border-left: 4px solid #008080;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: #fff;
 }
 
-#solutions li:nth-child(odd){
-  background-color: #EEE;
+.solution.no {
+  border-left-color: #c9a400;
+  background: #fffdf3;
+}
+
+.solution.halt {
+  border-left-color: #b00020;
+  background: #fff5f6;
+}
+
+.solution-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #444;
+}
+
+.solution-badge {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: #008080;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.solution.no .solution-badge {
+  background: #c9a400;
+}
+
+.solution.halt .solution-badge {
+  background: #b00020;
+}
+
+.solution-term,
+.solution-error,
+.bindings {
+  margin: 8px 0 0 0;
+  font-family: monospace;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.solution-error {
+  color: #b00020;
+}
+
+.bindings {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 10px;
+  row-gap: 6px;
+  align-items: baseline;
+}
+
+.bindings dt {
+  font-weight: bold;
+  color: #000;
+}
+
+.bindings dt::after {
+  content: " =";
+  color: #888;
+  font-weight: normal;
+}
+
+.bindings dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.binding-chip {
+  border-radius: 10px;
+  padding: 0 8px;
+  color: #fff;
+}
+
+.binding-empty {
+  color: #999;
 }
 
 .output{
@@ -57,29 +330,167 @@ body {
 * GRAPH TAB
 ***************/
 
+/* `#graph` stacks the bar (legend, supports toggle, stages) over the graph. */
+body.mode-structured #graph {
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  color: #555;
+}
+
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.graph-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Attacks take the colour of the attacker, so the legend only shows the stroke. */
+.legend-line {
+  display: inline-block;
+  width: 26px;
+  border-top: 2px solid #555;
+}
+
+.legend-line.support {
+  border-top: 2px dashed #9a9a9a;
+}
+
+.graph-stages {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.graph-stages[hidden] {
+  display: none;
+}
+
+.graph-stages .stage-label {
+  min-width: 80px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .graph-container {
-  height:100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
   position: relative;
 }
 
-.graph-drawing, .graph-text {
-  height:100%;
-  width: 100%;
+#graph-visual {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
 }
 
-.graph-text {
-  z-index: 10;
+.graph-empty {
+  position: absolute;
+  top: 40%;
+  width: 100%;
+  text-align: center;
+  color: #808080;
+  font-style: italic;
   pointer-events: none;
-  justify-content: flex-start; 
-  padding: 10px;
+}
+
+.graph-empty[hidden],
+.argument-popup[hidden] {
+  display: none;
+}
+
+/***************
+* ARGUMENT POPUP
+***************/
+
+.argument-popup {
+  position: absolute;
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, calc(100% - 16px));
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.argument-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.argument-label {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+}
+
+.argument-popup-row {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.argument-popup-title {
+  color: #888;
+}
+
+.argument-term {
+  font-family: monospace;
+  word-break: break-word;
+}
+
+.argument-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.argument-chip {
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.argument-none {
+  color: #aaa;
 }
 
 .overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -113,10 +524,6 @@ body.mode-abstract label span.abstract-only {
   display: inline;
 }
 
-.mode-selector {
-  margin-left: 10px;
-}
-
 .mode-selector .btn.active {
   background-color: #6c757d;
   color: #fff;
@@ -129,15 +536,14 @@ body.mode-abstract label span.abstract-only {
   display: flex;
 }
 
+body.mode-abstract .result-panel {
+  padding-left: 0;
+}
+
 body.mode-abstract #input-panel {
   display: none;
 }
 
-/* `.structured-only` turns this into a flex item, but the graph panel owns its
-   own internal layout. */
-body.mode-structured #graph {
-  display: block;
-}
 
 /***************
 * ABSTRACT MODE
@@ -184,4 +590,121 @@ body.mode-structured #graph {
 
 .semantics-picker select {
   margin-left: 5px;
+  width: auto;
+}
+
+/***************
+* SMALL SCREENS
+***************/
+
+/* Below Bootstrap's `lg` breakpoint (phones and portrait tablets) there is no
+   room for side by side panels: they are stacked, each gets a fixed height,
+   and the page itself scrolls. Drag-to-resize handles are useless on touch,
+   so they go away too. */
+@media (max-width: 991.98px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100vh;
+    display: block;
+  }
+
+  .workspace {
+    flex-direction: column;
+    padding: 8px 12px 16px 12px;
+  }
+
+  #input-panel,
+  #solutions {
+    resize: none;
+  }
+
+  #input-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 35vh;
+    min-height: 220px;
+    padding: 0 0 10px 0;
+    border-right: none;
+    border-bottom: var(--panel-border);
+    margin-bottom: 10px;
+  }
+
+  .result-panel {
+    padding-left: 0;
+    overflow: visible;
+  }
+
+  .tab-content,
+  .tab-pane,
+  .solutions-layout {
+    height: auto;
+  }
+
+  #flags {
+    height: 50vh;
+    min-height: 240px;
+  }
+
+  #con-tab {
+    max-height: 70vh;
+  }
+
+  .solutions-layout {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  #solutions {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    padding: 10px 0;
+    border-right: none;
+    border-bottom: var(--panel-border);
+  }
+
+  #graph {
+    height: auto;
+    overflow: visible;
+  }
+
+  .graph-stages .btn {
+    padding: 6px 16px;
+  }
+
+  /* The canvas leaves some page visible below it, so a vertical swipe that
+     starts outside the graph can always scroll the page. */
+  .graph-container {
+    flex: none;
+    height: 60vh;
+    min-height: 300px;
+  }
+
+  #abstract-panel {
+    height: auto;
+    padding: 10px 0;
+  }
+
+  #abstract-editor {
+    flex: none;
+    height: 60vh;
+    min-height: 300px;
+  }
+
+}
+
+/* Larger touch targets for coarse pointers, whatever the screen size. */
+@media (pointer: coarse) {
+  .navbar-nav .nav-link,
+  .dropdown-item {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .mode-selector .btn {
+    padding: 6px 12px;
+  }
 }

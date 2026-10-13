@@ -33,7 +33,8 @@
     "webpack-merge": "6.0.1"
   },
   "dependencies": {
-    "@tuprolog/arg2p": "0.16.8",
+    "@tuprolog/arg2p": "0.17.0",
+    "fflate": "0.8.2",
     "sync-request": "latest",
     "vis-network": "latest"
   }

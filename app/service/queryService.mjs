@@ -37,8 +37,9 @@ function queryService() {
         // const solutions = tryBlock(() => solver.solve(query), "Solve Error");
         // const i = solutions.iterator();
         
-        const { i, query } = tryBlock(() => common.tuprolog.bridge.solve(queryText, theoryText, flagsText, outputConsumer), "Solve Error");
-        return { i, query };
+        const result = tryBlock(() => common.tuprolog.bridge.solve(queryText, theoryText, flagsText, outputConsumer), "Solve Error");
+        // `result` also gives access to every stage of the computation (graphAt).
+        return { i: result.i, query: result.query, result };
     }
 
     function tryBlock(fun, name) {

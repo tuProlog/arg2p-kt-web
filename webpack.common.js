@@ -16,7 +16,14 @@ module.exports = {
 	},
 	module: {
 		rules: [{
+			// The page's own stylesheet is inlined into index.html (see the
+			// template), so the layout is there before the bundles run.
 			test: /\.css$/,
+			resourceQuery: /inline/,
+			type: 'asset/source'
+		}, {
+			test: /\.css$/,
+			resourceQuery: { not: [/inline/] },
 			use: ['style-loader', 'css-loader']
 		}, {
 			test: /\.ttf$/,

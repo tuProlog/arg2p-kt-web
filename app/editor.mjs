@@ -23,6 +23,11 @@ monaco.languages.setMonarchTokensProvider('tuprolog', {
 			// atoms: lowercase identifiers, possibly with underscores or digits
 			[/[a-z][a-zA-Z_0-9]*/, 'atom'],
 
+            // variables: an uppercase letter or an underscore, then any identifier
+            // characters. Without this rule `In` was split into an unstyled `I`
+            // and an atom `n`.
+            [/[A-Z_][a-zA-Z_0-9]*/, 'variable'],
+
             // --- WHITESPACE ---
             { include: '@whitespace' },
 
@@ -33,12 +38,10 @@ monaco.languages.setMonarchTokensProvider('tuprolog', {
             [/"([^"\\]|\\.)*$/, 'string.invalid'],  
             [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
 
-            // --- CHARACTER LITERALS ---
-            // normal char: 'a'
-            [/'[^\\']'/, 'string'],
-            // escaped char: '\n'
-            [/'(@escapes)'/, ['string', 'string.escape', 'string']],
-            // everything else starting with '
+            // --- QUOTED ATOMS ---
+            // 'a', '::', 'hello world', with escapes such as '\n' or ''
+            [/'([^'\\]|\\.|'')*'/, 'string'],
+            // an unterminated quote
             [/'/, 'string.invalid'],
 
             // --- OPERATORS ---
@@ -84,7 +87,8 @@ monaco.editor.defineTheme('myTheme', {
 		{ token: 'atom', foreground: '800000' },
 		{ token: 'number', foreground: '800000' },
 		{ background: 'EDF9FA' },
-		{ token: 'comment', foreground: '808080' } 
+		{ token: 'comment', foreground: '808080' },
+		{ token: 'variable', foreground: '000000' }
 	],
     colors: {
         'editor.lineHighlightBackground': '#00000000',
