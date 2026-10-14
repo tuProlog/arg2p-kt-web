@@ -172,15 +172,25 @@ function startup() {
         const { i, query, result } = queryService.default
             .solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
 
+        // Shows a solution's graph, or its labelling on the canvas. A failed
+        // solution carries the graph left over from the last attempt, so the
+        // canvas is only recoloured on an actual labelling.
+        const show = solution => {
+            if (graphManager !== null) graphManager.showSolution(solution, result)
+            else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
+        };
+
+        // The final "no more solutions" keeps the graph of the last solution on
+        // screen, the one its card shows as selected. A first answer always
+        // shows its graph, even a failure.
+        let answered = false;
         resultManager.printSolution(i, query, () => {
             document.querySelector(".overlay").style.display = "flex"
         }, solution => {
             document.querySelector(".overlay").style.display = "none"
-            if (graphManager !== null) graphManager.showSolution(solution, result)
-            // A failed solution carries the graph left over from the last attempt,
-            // so the canvas is only recoloured on an actual labelling.
-            else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
-        }, { hideExhaustedNo: abstract });
+            if (solution.res === "yes" || !answered) show(solution)
+            answered = true
+        }, { hideExhaustedNo: abstract, onShow: show });
     });
 
     // A shared link opens on its result: it is run as if RUN had been pressed,

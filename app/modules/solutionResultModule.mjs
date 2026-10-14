@@ -60,6 +60,7 @@ function SolutionResultModule() {
             element.appendChild(sol.substitutions.length > 0
                 ? bindingsOf(sol.substitutions)
                 : textBlock("solution-term", sol.query));
+            if (settings.onShow) selectable(element, sol, settings.onShow);
         } else if (sol.res == "no") {
             element = solutionCard("no", run.accepted > 0 ? "No more solutions" : "No solutions");
         } else {
@@ -68,11 +69,40 @@ function SolutionResultModule() {
         }
         solutionList.appendChild(element);
         element.scrollIntoView({ block: "nearest" });
+        // The newest solution is the one on the graph.
+        if (sol.res == "yes") markShown(element);
         // A plain `yes` with no bindings (e.g. arg2p::solve) only repeats the
-        // query: the pane is shown for bindings, failures and errors.
-        if (sol.res != "yes" || sol.substitutions.length > 0) {
+        // query: the pane is shown for bindings, failures and errors, and as
+        // soon as there is a second solution to pick from.
+        if (sol.res != "yes" || sol.substitutions.length > 0 || run.accepted > 1) {
             parentHtml.parentNode.classList.remove("trivial");
         }
+    }
+
+    // A solution card brings its graph (or labelling) back when picked, so the
+    // earlier solutions stay reachable after Next.
+    function selectable(element, sol, onShow) {
+        element.classList.add("selectable");
+        element.tabIndex = 0;
+        element.setAttribute("role", "button");
+        element.title = "Show the graph of this solution";
+        const show = () => {
+            markShown(element);
+            onShow(sol);
+        };
+        element.addEventListener("click", show);
+        element.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                show();
+            }
+        });
+    }
+
+    function markShown(element) {
+        parentHtml.querySelectorAll(".solution.shown").forEach(it => it.classList.remove("shown"));
+        element.classList.add("shown");
+        element.setAttribute("aria-pressed", "true");
     }
 
     function solutionCard(kind, title) {

@@ -250,6 +250,24 @@ body.mode-structured #graph.empty {
   background: #fff;
 }
 
+/* With several solutions, picking one brings its graph back. */
+.solution.selectable {
+  cursor: pointer;
+}
+
+.solution.selectable:hover {
+  background: #f4fafa;
+}
+
+.solution.selectable:focus {
+  outline: none;
+}
+
+.solution.selectable:focus-visible,
+.solution.shown {
+  box-shadow: 0 0 0 2px rgba(0, 128, 128, 0.45);
+}
+
 .solution.no {
   border-left-color: #c9a400;
   background: #fffdf3;
