@@ -134,6 +134,12 @@ body.mode-structured #graph.empty {
   display: none;
 }
 
+/* ...but a plain yes is only left out when the graph is there to show the
+   result: a query like `pippo` builds no graph, and its yes is the answer. */
+.solutions-layout:has(#graph.empty) #solutions.trivial {
+  display: block;
+}
+
 .solutions-layout:has(#graph.empty) #solutions {
   flex: 1;
   border-right: none;
