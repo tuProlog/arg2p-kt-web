@@ -173,7 +173,7 @@ function startup() {
             .solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
 
         resultManager.printSolution(i, query, () => {
-            document.querySelector(".overlay").style.display = "block"
+            document.querySelector(".overlay").style.display = "flex"
         }, solution => {
             document.querySelector(".overlay").style.display = "none"
             if (graphManager !== null) graphManager.showSolution(solution, result)
@@ -252,11 +252,9 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
     semanticsSelector.addEventListener("change", () =>
         flagsManager.setFlag(LABELLING_FLAG, semanticsSelector.value));
 
-    document.querySelector(".share").addEventListener("click", e => {
-        e.preventDefault();
-        closeMenu();
-        share(urlParamsService.shareUrl(currentState()));
-    });
+    document.querySelector("button.share").addEventListener("click", () =>
+        openShareDialog(urlParamsService.shareUrl(currentState())));
+    setShareDialogListeners();
 }
 
 // On small screens the navbar links live in a collapsible menu that would
@@ -265,13 +263,50 @@ function closeMenu() {
     if (window.jQuery !== undefined) window.jQuery("#navbar-menu").collapse("hide");
 }
 
-function share(url) {
-    const copied = navigator.clipboard !== undefined
-        ? navigator.clipboard.writeText(url)
-        : Promise.reject();
-    copied
-        .then(() => alert(`SHAREABLE LINK \nCopied to the clipboard.\n\n${url}`))
-        .catch(() => prompt("Shareable link :", url));
+const shareDialog = document.querySelector(".share-dialog");
+const shareField = shareDialog.querySelector(".share-url");
+const shareCopy = shareDialog.querySelector(".share-copy");
+
+function openShareDialog(url) {
+    shareField.value = url;
+    shareCopy.innerText = "Copy";
+    shareDialog.showModal();
+    shareField.select();
+}
+
+function setShareDialogListeners() {
+    shareCopy.addEventListener("click", () => {
+        shareField.select();
+        copyText(shareField.value).then(copied => {
+            shareCopy.innerText = copied ? "Copied ✓" : "Press Ctrl+C";
+        });
+    });
+    // The system share sheet (WhatsApp, mail...) where the browser has one.
+    const native = shareDialog.querySelector(".share-native");
+    native.hidden = navigator.share === undefined;
+    native.addEventListener("click", () =>
+        navigator.share({ title: document.title, url: shareField.value }).catch(() => { }));
+    // A click on the backdrop (outside the dialog box) closes it.
+    shareDialog.addEventListener("click", e => {
+        if (e.target === shareDialog) shareDialog.close();
+    });
+}
+
+// Resolves to whether the text made it to the clipboard: the async clipboard
+// needs a secure context, the older command works on plain http too.
+function copyText(text) {
+    if (navigator.clipboard !== undefined) {
+        return navigator.clipboard.writeText(text).then(() => true, () => legacyCopy());
+    }
+    return Promise.resolve(legacyCopy());
+}
+
+function legacyCopy() {
+    try {
+        return document.execCommand("copy");
+    } catch (error) {
+        return false;
+    }
 }
 
 function readFile(file, cb) {

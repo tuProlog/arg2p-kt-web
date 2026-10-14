@@ -26,11 +26,38 @@
 </head>
 
 <body>
+    <!-- Shown while the solver runs. The solver blocks the page, so the
+         animation only uses transform and opacity on plain elements, which
+         the browser keeps animating on its compositor meanwhile. -->
     <div class="overlay" style="display: none;">
-        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
-            <h3><b>SOLVING</b></h3>
+        <div class="solving" role="status" aria-live="polite">
+            <div class="solving-graph" aria-hidden="true">
+                <div class="solving-spin">
+                    <span class="solving-edge e1"><span class="solving-bar"></span><span class="solving-head"></span></span>
+                    <span class="solving-edge e2"><span class="solving-bar"></span><span class="solving-head"></span></span>
+                    <span class="solving-edge e3"><span class="solving-bar"></span><span class="solving-head"></span></span>
+                    <span class="solving-node n1"></span>
+                    <span class="solving-node n2"></span>
+                    <span class="solving-node n3"></span>
+                </div>
+            </div>
+            <div class="solving-label">Solving…</div>
         </div>
     </div>
+    <dialog class="share-dialog" aria-labelledby="share-title">
+        <form method="dialog">
+            <h5 id="share-title">Share</h5>
+            <p class="share-hint">The link opens the playground as it is now, and runs it.</p>
+            <div class="share-link">
+                <input type="text" readonly class="form-control share-url" aria-label="Link to share">
+                <button type="button" class="btn btn-primary share-copy">Copy</button>
+            </div>
+            <div class="share-actions">
+                <button type="button" class="btn btn-outline-secondary share-native" hidden>Share via…</button>
+                <button value="close" class="btn btn-link share-close">Close</button>
+            </div>
+        </form>
+    </dialog>
     <nav class="navbar navbar-expand-lg fixed-top navbar-light bg-light">
         <a class="navbar-brand" href="https://legalmachinelab.unibo.it/arg2p/">Arg2p <span class="d-none d-sm-inline">Web Playground</span></a>
         <!-- The mode is the one control used all the time, so it stays out of the
@@ -61,7 +88,6 @@
                         <a class="dropdown-item example" href="#" data-example="oddCycle">Odd Cycle</a>
                     </div>
                 </li>
-                <li class="nav-item"><a class="nav-link share" href="#" title="Copy a link that restores the current theory, query and flags">Share</a></li>
             </ul>
             <span class="navbar-text version">VERSION</span>
         </div>
@@ -112,6 +138,7 @@
                     <div id="query" name="query"></div>
                     <button class="solve btn btn-primary">RUN</button>
                     <button class="next btn btn-outline-primary" title="Show the next solution of the query" disabled>Next</button>
+                    <button class="share btn btn-outline-secondary" title="Share a link to this theory, query and flags" aria-label="Share"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
                 </div>
             </div>
             <div id="info">

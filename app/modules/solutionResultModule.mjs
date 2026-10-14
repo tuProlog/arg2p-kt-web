@@ -160,11 +160,13 @@ function SolutionResultModule() {
         nextButton.disabled = true;
         beforeNext()
         new Promise((resolve, reject) => {
-            setTimeout(function() {
+            // The solver blocks the page: it starts once the overlay has been
+            // painted, so that its animation is already running meanwhile.
+            afterNextPaint(() => {
                 let solution = iterator.next()
                 addDomSolution(solution, list, settings, run);
                 resolve(solution)
-            }, 0)
+            })
         }).then(sol => {
             // Checked once the solution is consumed, so Next is only offered
             // when there really is another one. A run replaced in the meantime
@@ -172,6 +174,10 @@ function SolutionResultModule() {
             if (run === activeRun) nextButton.disabled = !iterator.hasNext();
             afterNext(sol)
         })
+    }
+
+    function afterNextPaint(callback) {
+        requestAnimationFrame(() => requestAnimationFrame(callback));
     }
 
     return { init }
