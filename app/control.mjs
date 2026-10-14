@@ -83,6 +83,12 @@ function fitQueryHeight() {
 queryEditor.onDidContentSizeChange(fitQueryHeight);
 fitQueryHeight();
 
+// Abstract mode fills the query editor with the query generated from the
+// graph, so the structured one is kept here meanwhile and given back when
+// switching back. Otherwise the generated query would leak into structured
+// mode (and into the links shared from it).
+let structuredQuery = queryEditor.getValue();
+
 
 function startup() {
     const flagsManager = flagsModule.default.init(flagsContainer, urlState.flags);
@@ -100,6 +106,8 @@ function startup() {
     }
 
     function applyMode(newMode) {
+        const leavingAbstract = mode === ABSTRACT && newMode !== ABSTRACT;
+        if (mode !== ABSTRACT && newMode === ABSTRACT) structuredQuery = queryEditor.getValue();
         mode = newMode;
         document.body.classList.toggle("mode-abstract", mode === ABSTRACT);
         document.body.classList.toggle("mode-structured", mode === STRUCTURED);
@@ -110,8 +118,9 @@ function startup() {
             syncSemanticsSelector(flagsManager);
             refreshAbstractQuery();
             abstractManager.resize();
-        } else if (queryEditor.getValue().trim() === "") {
-            queryEditor.setValue(DEFAULT_QUERY);
+        } else {
+            if (leavingAbstract) queryEditor.setValue(structuredQuery);
+            if (queryEditor.getValue().trim() === "") queryEditor.setValue(DEFAULT_QUERY);
         }
     }
 
@@ -119,6 +128,8 @@ function startup() {
         if (example.mode === ABSTRACT) abstractManager.setGraph(example.abstractGraph);
         else {
             theoryEditor.setValue(example.theory);
+            // Also the one restored when coming from abstract mode.
+            structuredQuery = example.query;
             queryEditor.setValue(example.query);
         }
         applyMode(example.mode);
@@ -171,6 +182,15 @@ function startup() {
             else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
         }, { hideExhaustedNo: abstract });
     });
+
+    // A shared link opens on its result: it is run as if RUN had been pressed,
+    // once the page has been drawn. A plain visit runs nothing.
+    if (sharesState(urlState)) setTimeout(() => document.querySelector("button.solve").click(), 0);
+}
+
+function sharesState(state) {
+    return [state.mode, state.theory, state.query, state.flags, state.abstractGraph]
+        .some(it => it !== null);
 }
 
 // The flags editor owns the semantics: the selector only mirrors it, and adopts
