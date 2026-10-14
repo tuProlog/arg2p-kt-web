@@ -22,6 +22,8 @@ function SolutionResultModule() {
         parentHtml = solutionBox;
         nextButton = next;
         nextButton.disabled = true;
+        nextButton.onclick = null;
+        activeRun = null;
         return { printSolution };
     }
 

@@ -108,6 +108,7 @@ function startup() {
     function applyMode(newMode) {
         const leavingAbstract = mode === ABSTRACT && newMode !== ABSTRACT;
         if (mode !== ABSTRACT && newMode === ABSTRACT) structuredQuery = queryEditor.getValue();
+        if (newMode !== mode) clearResults();
         mode = newMode;
         document.body.classList.toggle("mode-abstract", mode === ABSTRACT);
         document.body.classList.toggle("mode-structured", mode === STRUCTURED);
@@ -122,6 +123,16 @@ function startup() {
             if (leavingAbstract) queryEditor.setValue(structuredQuery);
             if (queryEditor.getValue().trim() === "") queryEditor.setValue(DEFAULT_QUERY);
         }
+    }
+
+    // The results belong to the mode they were computed in, so switching mode
+    // drops them: solutions, console, graph and the canvas labelling.
+    function clearResults() {
+        solutionResultModule.default.init(solutionsList, nextButton);
+        consoleModule.default.init(outputConsole).clear();
+        graphContainer.innerHTML = "";
+        graphContainer.classList.remove("empty");
+        abstractManager.resetLabelling();
     }
 
     function applyExample(example) {
