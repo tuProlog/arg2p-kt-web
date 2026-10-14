@@ -2,6 +2,7 @@ const path = require('path');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 const CompressionPlugin = require("compression-webpack-plugin");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
 	entry: {
@@ -51,6 +52,13 @@ module.exports = {
 		new HtmlWebpackPlugin({
 		  title: 'Arg2p Playground',
 		  template: 'assets/index.html'
+		}),
+		// The web app manifest and its icons, served next to index.html.
+		new CopyPlugin({
+		  patterns: [
+			{ from: 'assets/pwa/manifest.webmanifest', to: 'manifest.webmanifest' },
+			{ from: 'assets/pwa/*.{png,svg}', to: 'icons/[name][ext]' }
+		  ]
 		})
 	  ],
 	optimization: {

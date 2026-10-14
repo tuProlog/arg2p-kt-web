@@ -3,7 +3,10 @@
 ***************/
 
 :root {
-  --navbar-height: 56px;
+  /* Installed on a phone with a notch, the app draws under the status bar:
+     the navbar is pushed below it (env() is 0 everywhere else). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --navbar-height: calc(56px + var(--safe-top));
   --panel-border: 2px solid #ddd;
 }
 
@@ -22,6 +25,12 @@ body {
   padding: var(--navbar-height) 0 0 0;
   display: flex;
   flex-direction: column;
+}
+
+.navbar {
+  padding-top: calc(0.5rem + var(--safe-top));
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
 }
 
 .navbar .mode-selector {

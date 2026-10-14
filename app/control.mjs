@@ -263,3 +263,9 @@ function readFile(file, cb) {
 };
 
 startup();
+
+// Makes the playground installable and usable offline. Only the production
+// build has a service worker: the dev server is always served fresh.
+if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js"));
+}
