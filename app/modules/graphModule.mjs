@@ -6,12 +6,25 @@ import { layeredLayout } from './layeredLayout.mjs';
 const SUPPORTS_SETTING = "arg2p.showSupports";
 const CONCLUSIONS_SETTING = "arg2p.showConclusions";
 const SUPPORT_COLOR = "#9a9a9a";
-// Longer conclusions are shortened on the node: the popup has the full text.
-const CONCLUSION_LENGTH = 24;
-// Horizontal room per node, wider when the nodes also carry their conclusion.
-const NODE_SPACING = 90;
-const NODE_SPACING_WITH_CONCLUSIONS = 150;
+// Conclusions on the nodes are wrapped at their commas into lines of about
+// this length, and cut after a few lines: the popup has the full text.
+const CONCLUSION_LINE = 18;
+const CONCLUSION_LINES = 3;
+// The layout keeps nodes this far apart, edge to edge, and rows at least
+// LEVEL_SEPARATION apart.
+const NODE_GAP = 40;
 const LEVEL_SEPARATION = 100;
+// Size of a drawn node: vis draws a label in 14px arial, 28px per line, inside
+// an ellipse about 1.32 times as wide as its widest line (measured).
+const LABEL_FONT = "14px arial";
+const LINE_HEIGHT = 28;
+const ELLIPSE_RATIO = 1.32;
+const ELLIPSE_PADDING = 6;
+// Attacks are curved, so that mutual attacks do not overlap; long ones are
+// curved less, or they would arc across the whole drawing.
+const CURVE = 0.25;
+const CURVE_LENGTH = 160;
+const MIN_CURVE = 0.06;
 
 function GraphModule() {
 
@@ -27,6 +40,7 @@ function GraphModule() {
     let details = new Map();
     let levels = new Map();
     let supports = [];
+    let attackList = [];
 
     // The stages of the solution shown: the solver context is kept for every
     // step of the computation, numbered from 0 to the context of the solution.
@@ -98,12 +112,26 @@ function GraphModule() {
     // Computed again for every graph shown: the same arguments get the same
     // place, so stepping through the stages does not move them around.
     function placeNodes() {
-        const wide = panel.querySelector(".show-conclusions").checked
+        const area = panel.querySelector(".graph-container")
+        const sizes = new Map([...levels.keys()].map(name => [name, nodeSize(nodeLabel(name))]))
         const positions = layeredLayout(levels, supports, {
-            spacing: wide ? NODE_SPACING_WITH_CONCLUSIONS : NODE_SPACING,
-            levelSeparation: LEVEL_SEPARATION
+            sizes,
+            gap: NODE_GAP,
+            levelSeparation: LEVEL_SEPARATION,
+            attacks: attackList,
+            // Fill the panel rather than drawing a thin strip in its middle.
+            aspect: area.clientWidth > 0 ? area.clientHeight / area.clientWidth : null
         })
         nodes.update([...positions].map(([name, point]) => ({ id: toInt(name), x: point.x, y: point.y })))
+        edges.update(attackList
+            .filter(it => positions.has(it.from) && positions.has(it.to))
+            .map(it => {
+                const from = positions.get(it.from)
+                const to = positions.get(it.to)
+                const length = Math.hypot(to.x - from.x, to.y - from.y)
+                const roundness = Math.max(MIN_CURVE, Math.min(CURVE, CURVE * CURVE_LENGTH / length))
+                return { id: `${it.from}->${it.to}`, smooth: { type: "curvedCW", roundness } }
+            }))
     }
 
     function prepareContainer(container) {
@@ -208,13 +236,13 @@ function GraphModule() {
         const ids = argumentList.map(it => toInt(it.id))
         levels = levelsOf(argumentList)
         supports = supportsList
+        attackList = attacks
         nodes.remove(nodes.getIds().filter(it => !ids.includes(it)))
         nodes.update(argumentList.map(it => ({
             id: toInt(it.id),
             label: nodeLabel(it.id),
             color: labelColor(it.label)
         })))
-        placeNodes()
 
         const showSupports = panel.querySelector(".show-supports").checked
         const wanted = [
@@ -240,6 +268,7 @@ function GraphModule() {
         const edgeIds = wanted.map(it => it.id)
         edges.remove(edges.getIds().filter(it => !edgeIds.includes(it)))
         edges.update(wanted)
+        placeNodes()
 
         if (wasEmpty && nodes.length > 0) network.fit()
     }
@@ -247,10 +276,34 @@ function GraphModule() {
     function nodeLabel(name) {
         const argument = details.get(name)
         if (argument === undefined || !panel.querySelector(".show-conclusions").checked) return name
-        const conclusion = argument.conclusion.length > CONCLUSION_LENGTH
-            ? argument.conclusion.slice(0, CONCLUSION_LENGTH - 1) + "…"
-            : argument.conclusion
-        return `${name}\n${conclusion}`
+        return [name, ...wrapTerm(argument.conclusion)].join("\n")
+    }
+
+    // `caFa(closedReg, damages)` -> ["caFa(closedReg,", "damages)"]: lines
+    // broken after commas, the last one cut short when there are too many.
+    function wrapTerm(term) {
+        const lines = []
+        term.split(/(?<=,) /).forEach(part => {
+            const last = lines.length - 1
+            if (last >= 0 && (lines[last] + " " + part).length <= CONCLUSION_LINE) lines[last] += " " + part
+            else lines.push(part)
+        })
+        if (lines.length <= CONCLUSION_LINES) return lines
+        return [...lines.slice(0, CONCLUSION_LINES - 1), lines[CONCLUSION_LINES - 1] + " …"]
+    }
+
+    let measure = null
+
+    // The size vis will draw a node with this label at (see LINE_HEIGHT).
+    function nodeSize(label) {
+        if (measure === null) {
+            measure = document.createElement("canvas").getContext("2d")
+            measure.font = LABEL_FONT
+        }
+        const lines = label.split("\n")
+        const height = lines.length * LINE_HEIGHT
+        const text = Math.max(...lines.map(it => measure.measureText(it).width))
+        return { width: Math.max(height, text * ELLIPSE_RATIO + ELLIPSE_PADDING), height }
     }
 
     function showPopup(id) {
