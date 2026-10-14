@@ -1,4 +1,10 @@
+<p align="center"><img src="assets/pwa/icon.svg" width="200" alt="A2P logo"></p>
+
 # [Arg2P-Kt](https://github.com/tuProlog/arg2p-kt) Web Playground
+
+Try it at <https://tuprolog.github.io/arg2p-kt-web/>. The playground can be
+installed as an app (*Install app* in Chrome and Edge, *Add to Home Screen* on
+iOS) and then works offline.
 
 ## Install
 ```bash
@@ -48,7 +54,9 @@ The playground runs in one of two modes, selected from the toolbar:
 
 The playground restores its state from the query string, so an example can be
 handed over as a plain link. *Share* in the toolbar builds one from whatever is
-currently loaded.
+currently loaded: it packs the whole state in a single compressed `s`
+parameter. Links can also be written by hand with the plain parameters below,
+which keep working.
 
 | Parameter | Mode | Meaning |
 | --- | --- | --- |
