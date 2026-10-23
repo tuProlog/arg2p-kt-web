@@ -15,7 +15,9 @@ function offeredSemantics() {
 }
 
 // Every labelling module arg2p registers, minus the statement labellings (a
-// different flag) and the legacy `grounded.old` duplicate of `grounded`.
+// different flag), the legacy `grounded.old` duplicate of `grounded`, and
+// `scc`, the decomposition cf2 and stage2 are built on (not a semantics of
+// its own: the flags documentation does not list it).
 function bundledLabellingModules() {
   const source = readFileSync(
     new URL('../node_modules/@tuprolog/arg2p/arg2p-core.js', import.meta.url), 'utf8');
@@ -23,7 +25,8 @@ function bundledLabellingModules() {
     .map(it => it[1]);
   return [...new Set(modules)]
     .filter(it => !it.startsWith('statement'))
-    .filter(it => it !== 'grounded.old');
+    .filter(it => it !== 'grounded.old')
+    .filter(it => it !== 'scc');
 }
 
 const flagsOf = semantics => `

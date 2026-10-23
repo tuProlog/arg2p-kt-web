@@ -9,7 +9,6 @@ iOS) and then works offline.
 ## Install
 ```bash
   npm install
-  sed -i '0,/return solverFactory(ModuleNames_instance\.[a-zA-Z0-9_$]\+(true), \[ModuleNames_instance\.[a-zA-Z0-9_$]\+(false)\]);/s//return require(".\/2p-solve-prolog.js").it.unibo.tuprolog.solve.prolog.PrologSolverFactory;/' node_modules/@tuprolog/arg2p/2p-solve.js
 ```
 
 ## Usage
