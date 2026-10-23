@@ -2,6 +2,7 @@ import { monaco } from './editor.mjs';
 
 import * as consoleModule from './modules/consoleModule.mjs';
 import * as flagsModule from './modules/flagsModule.mjs';
+import { DEFAULT_FLAGS } from './modules/flagsModule.mjs';
 import * as graphModule from './modules/graphModule.mjs';
 import * as abstractGraphModule from './modules/abstractGraphModule.mjs';
 import * as solutionResultModule from './modules/solutionResultModule.mjs';
@@ -166,6 +167,7 @@ function startup() {
     reportUrlErrors(urlState.errors);
 
     setListeners(applyMode, applyExample, currentState, flagsManager, _ => {
+        solvedOnce = true;
         // The mode is captured here: switching it while solutions are still being
         // enumerated must not change where the pending ones are rendered.
         const abstract = mode === ABSTRACT;
@@ -209,8 +211,33 @@ function startup() {
     });
 
     // A shared link opens on its result: it is run as if RUN had been pressed,
-    // once the page has been drawn. A plain visit runs nothing.
+    // once the page has been drawn. A plain visit runs nothing visible, but
+    // warms the solver up.
     if (sharesState(urlState)) setTimeout(() => document.querySelector("button.solve").click(), 0);
+    else whenIdle(warmUp);
+}
+
+// The first solve is much slower than the next ones (about 0.8s against 0.2s
+// for Tweety): the solver's code is compiled and initialised on first use.
+// One is run, unseen, once the page is idle, so that the first RUN takes as
+// long as the following ones. Not when the user has already run something.
+let solvedOnce = false;
+
+function warmUp() {
+    if (solvedOnce) return;
+    try {
+        const { i } = queryService.default.solve(examples.tweety.theory, DEFAULT_QUERY, DEFAULT_FLAGS, () => { });
+        if (i.hasNext()) i.next();
+    } catch (error) {
+        // Only a warm-up: nothing to report.
+    }
+}
+
+function whenIdle(task) {
+    window.addEventListener("load", () => {
+        if ("requestIdleCallback" in window) requestIdleCallback(task, { timeout: 3000 });
+        else setTimeout(task, 1000);
+    });
 }
 
 function sharesState(state) {

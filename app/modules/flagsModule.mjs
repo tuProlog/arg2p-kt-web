@@ -190,4 +190,5 @@ function FlagsModule() {
     return { init }
 }
 
+export { DEFAULT_FLAGS }
 export default FlagsModule()
