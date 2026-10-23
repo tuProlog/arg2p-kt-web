@@ -28,7 +28,7 @@
     "monaco-editor": "0.57.0",
     "node-polyfill-webpack-plugin": "4.1.0",
     "style-loader": "4.0.0",
-    "webpack": "5.112.1",
+    "webpack": "5.112.2",
     "webpack-cli": "7.2.3",
     "webpack-dev-server": "6.1.0",
     "webpack-merge": "6.0.1",
