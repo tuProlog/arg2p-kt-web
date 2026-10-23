@@ -1,3 +1,4 @@
+import themeModule from './modules/themeModule.mjs';
 import 'monaco-editor/editor/browser/coreCommands.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
@@ -97,7 +98,28 @@ monaco.editor.defineTheme('myTheme', {
     },
 });
 
-monaco.editor.setTheme('myTheme');
+// The same colours, lightened to read on a dark background: atoms and
+// numbers in a soft red, variables in the text colour.
+monaco.editor.defineTheme('myThemeDark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+		{ token: 'atom', foreground: 'F08C7A' },
+		{ token: 'number', foreground: 'F08C7A' },
+		{ token: 'comment', foreground: '8B9096' },
+		{ token: 'variable', foreground: 'E3E5E8' }
+	],
+    colors: {
+        'editor.background': '#1F2125',
+        'editor.lineHighlightBackground': '#00000000',
+        'editor.lineHighlightBorder': '#00000000',
+        'editor.overviewRulerLanes': '#00000000'
+    },
+});
+
+const editorTheme = theme => theme === 'dark' ? 'myThemeDark' : 'myTheme';
+monaco.editor.setTheme(editorTheme(themeModule.current()));
+themeModule.onChange(theme => monaco.editor.setTheme(editorTheme(theme)));
 
 
 export { monaco }

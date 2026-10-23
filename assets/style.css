@@ -1027,3 +1027,276 @@ body.mode-abstract #input-panel {
     padding: 6px 12px;
   }
 }
+
+/***************
+* DARK MODE
+***************/
+
+/* The theme is set on <html> before the page is drawn (see index.html): the
+   system's by default, or the one picked with the toggle in the navbar.
+   Label colours (in, out, und) stay the same in both: they carry meaning. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --panel-border: 2px solid #33363c;
+  --bg: #17181b;
+  --surface: #1f2125;
+  --surface-2: #26282d;
+  --hover: #2c2f35;
+  --border: #383b42;
+  --text: #e3e5e8;
+  --muted: #9aa0a6;
+  --accent: #4fb8b4;
+}
+
+:root[data-theme="dark"] body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Bootstrap: navbar, menus, tabs, controls, buttons, alerts */
+:root[data-theme="dark"] .navbar.bg-light {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-brand,
+:root[data-theme="dark"] .navbar-light .navbar-nav .nav-link:hover,
+:root[data-theme="dark"] .navbar-light .navbar-nav .show > .nav-link {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-nav .nav-link,
+:root[data-theme="dark"] .navbar-light .navbar-text {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-toggler {
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+:root[data-theme="dark"] .dropdown-menu {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .dropdown-item {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .dropdown-item:hover,
+:root[data-theme="dark"] .dropdown-item:focus {
+  background: var(--hover);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .dropdown-header {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .dropdown-divider {
+  border-top-color: var(--border);
+}
+
+:root[data-theme="dark"] .nav-tabs {
+  border-bottom-color: var(--border);
+}
+
+:root[data-theme="dark"] .nav-tabs .nav-link {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .nav-tabs .nav-link:hover {
+  border-color: var(--border) var(--border) transparent;
+}
+
+:root[data-theme="dark"] .nav-tabs .nav-link.active {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border) var(--border) var(--bg);
+}
+
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .custom-select,
+:root[data-theme="dark"] #semantics {
+  background-color: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .custom-select {
+  /* Bootstrap's arrow is dark: the same one, light. */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='4' height='5' viewBox='0 0 4 5'%3e%3cpath fill='%23c8ccd2' d='M2 0L0 2h4zm0 5L0 3h4z'/%3e%3c/svg%3e");
+}
+
+:root[data-theme="dark"] .form-control:focus {
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .btn-outline-secondary {
+  color: #c3c7cd;
+  border-color: #5a5f66;
+}
+
+:root[data-theme="dark"] .btn-outline-secondary:hover,
+:root[data-theme="dark"] .mode-selector .btn.active {
+  background-color: #5a5f66;
+  border-color: #5a5f66;
+  color: #fff;
+}
+
+:root[data-theme="dark"] .btn-outline-primary {
+  color: #6ea8fe;
+  border-color: #3d79d6;
+}
+
+:root[data-theme="dark"] .btn-outline-primary:hover:not(:disabled) {
+  background-color: #3d79d6;
+  color: #fff;
+}
+
+:root[data-theme="dark"] .alert-warning {
+  background: #3a3214;
+  border-color: #5c4d1a;
+  color: #f0d58a;
+}
+
+/* The app */
+:root[data-theme="dark"] #query,
+:root[data-theme="dark"] #flags,
+:root[data-theme="dark"] #abstract-editor,
+:root[data-theme="dark"] .flags-group,
+:root[data-theme="dark"] .graph-bar {
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .solution {
+  background: var(--surface);
+  border-color: var(--border);
+  border-left-color: #008080;
+}
+
+:root[data-theme="dark"] .solution.selectable:hover {
+  background: var(--hover);
+}
+
+:root[data-theme="dark"] .solution.no {
+  background: #2a2617;
+  border-left-color: #c9a400;
+}
+
+:root[data-theme="dark"] .solution.halt {
+  background: #2e1c1f;
+  border-left-color: #e0556a;
+}
+
+:root[data-theme="dark"] .solution-error {
+  color: #f08c96;
+}
+
+:root[data-theme="dark"] .solution-header,
+:root[data-theme="dark"] .bindings dt,
+:root[data-theme="dark"] .flags-text summary,
+:root[data-theme="dark"] .solving-label {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .solution-query,
+:root[data-theme="dark"] .graph-bar,
+:root[data-theme="dark"] .flag-help,
+:root[data-theme="dark"] .flags-text-hint,
+:root[data-theme="dark"] .share-hint,
+:root[data-theme="dark"] .abstract-hint,
+:root[data-theme="dark"] .argument-label,
+:root[data-theme="dark"] .argument-popup-title,
+:root[data-theme="dark"] .graph-empty {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .flags-group legend,
+:root[data-theme="dark"] .flag-option-help {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .legend-line {
+  border-top-color: #aab0b6;
+}
+
+:root[data-theme="dark"] .argument-popup {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .overlay {
+  background: rgba(23, 24, 27, 0.75);
+}
+
+:root[data-theme="dark"] .share-dialog {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="dark"] .share-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="dark"] .abstract-rename {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .abstract-rename.invalid {
+  background: #3a2024;
+}
+
+/* vis's own editing toolbar (abstract mode) */
+:root[data-theme="dark"] #abstract-editor .vis-manipulation,
+:root[data-theme="dark"] #abstract-editor .vis-edit-mode {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] #abstract-editor .vis-button .vis-label,
+:root[data-theme="dark"] #abstract-editor .vis-button {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] #abstract-editor .vis-button:hover {
+  box-shadow: 0 0 3px 3px rgba(79, 184, 180, 0.4);
+}
+
+:root[data-theme="dark"] #abstract-editor .vis-close {
+  filter: invert(1);
+}
+
+:root[data-theme="dark"] #abstract-editor .vis-separator-line {
+  background: var(--border);
+}
+
+/* The theme toggle in the navbar */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  padding: 4px 8px;
+}
+
+.theme-toggle svg {
+  fill: currentColor;
+}
+
+.theme-toggle .icon-sun,
+:root[data-theme="dark"] .theme-toggle .icon-moon {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-sun {
+  display: inline;
+}

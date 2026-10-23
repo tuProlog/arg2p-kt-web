@@ -9,6 +9,7 @@ import * as solutionResultModule from './modules/solutionResultModule.mjs';
 import * as queryService from './service/queryService.mjs';
 import urlParamsService from './service/urlParamsService.mjs';
 import examples from './examples.mjs';
+import themeModule from './modules/themeModule.mjs';
 
 const STRUCTURED = urlParamsService.STRUCTURED;
 const ABSTRACT = urlParamsService.ABSTRACT;
@@ -92,6 +93,7 @@ let structuredQuery = queryEditor.getValue();
 
 
 function startup() {
+    themeModule.init(document.querySelector(".theme-toggle"));
     const flagsManager = flagsModule.default.init(flagsContainer, urlState.flags,
         document.querySelector(".flags-form"), document.querySelector(".flags-warnings"),
         // The form offers the same semantics as the picker of abstract mode.
