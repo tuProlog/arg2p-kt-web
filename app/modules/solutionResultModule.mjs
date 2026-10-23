@@ -24,9 +24,28 @@ function SolutionResultModule() {
         nextButton.disabled = true;
         nextButton.onclick = null;
         activeRun = null;
-        return { printSolution };
+        return { printSolution, printError };
     }
 
+
+    // An error that kept the query from running (e.g. a syntax error), as a
+    // card; clicking it calls `onClick` (to go to the error).
+    function printError(title, message, onClick) {
+        const card = solutionCard("halt", title);
+        card.querySelector(".solution-badge").innerText = "error";
+        card.appendChild(textBlock("solution-error", message));
+        if (onClick) {
+            card.classList.add("selectable");
+            card.tabIndex = 0;
+            card.title = "Go to the error";
+            card.addEventListener("click", onClick);
+        }
+        const list = document.createElement("ol");
+        list.className = "solution-list";
+        list.appendChild(card);
+        parentHtml.appendChild(list);
+        parentHtml.parentNode.classList.remove("trivial");
+    }
 
     function printSolution(iterator, query, beforeNext, afterNext, options) {
         const settings = options || {};

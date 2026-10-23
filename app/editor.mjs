@@ -1,6 +1,8 @@
 import themeModule from './modules/themeModule.mjs';
 import 'monaco-editor/editor/browser/coreCommands.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
+// Shows the message of a syntax error when hovering it.
+import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 
 monaco.languages.register({ id: 'tuprolog' })

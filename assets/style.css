@@ -184,6 +184,42 @@ body {
   white-space: nowrap;
 }
 
+/* Syntax errors under the editors (see syntaxModule): tapping one goes to it. */
+.syntax-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-left: 3px solid #b00020;
+  border-radius: 4px;
+  background: #fff5f6;
+  color: #b00020;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* The hover of an error offers Monaco's "view problem" and "quick fix"
+   actions, which this editor does not have. */
+.monaco-hover .hover-row.status-bar {
+  display: none;
+}
+
+.syntax-strip[hidden] {
+  display: none;
+}
+
+.syntax-place {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .syntax-strip {
+  background: #2e1c1f;
+  border-left-color: #e0556a;
+  color: #f08c96;
+}
+
 .theory-actions {
   display: flex;
   gap: 6px;

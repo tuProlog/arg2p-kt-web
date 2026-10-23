@@ -33,7 +33,7 @@ function FlagsModule() {
             listeners.forEach(listener => listener())
         })
         refreshForm()
-        return { flags, setFlag, flagValue, onChange, setFlags }
+        return { flags, setFlag, flagValue, onChange, setFlags, editor: () => editor }
     }
 
     function prepareContainer(container, initialFlags) {

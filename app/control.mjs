@@ -11,6 +11,7 @@ import urlParamsService from './service/urlParamsService.mjs';
 import examples from './examples.mjs';
 import themeModule from './modules/themeModule.mjs';
 import workspaceModule from './modules/workspaceModule.mjs';
+import syntaxModule from './modules/syntaxModule.mjs';
 
 const STRUCTURED = urlParamsService.STRUCTURED;
 const ABSTRACT = urlParamsService.ABSTRACT;
@@ -104,6 +105,7 @@ function startup() {
     // Every edit of the theory, query, flags, graph or mode is saved in the
     // working memory (shortly after, see workspaceModule).
     let workspace = null;
+    let syntax = null;
     const edited = () => { if (workspace !== null) workspace.changed(); };
     // In abstract mode the query is derived from the drawn graph, so every
     // edit to the graph refreshes the (read only) query editor.
@@ -142,6 +144,7 @@ function startup() {
             if (leavingAbstract) queryEditor.setValue(structuredQuery);
             if (queryEditor.getValue().trim() === "") queryEditor.setValue(DEFAULT_QUERY);
         }
+        if (syntax) syntax.query.check();
         edited();
     }
 
@@ -154,6 +157,26 @@ function startup() {
         graphContainer.classList.remove("empty");
         abstractManager.resetLabelling();
     }
+
+    // Syntax errors shown where they are, as the user types (see syntaxModule).
+    // The query of abstract mode is generated, so it is not checked.
+    syntax = {
+        theory: syntaxModule.attach(theoryEditor, document.querySelector(".theory-errors"), {
+            check: queryService.default.checkTheory
+        }),
+        query: syntaxModule.attach(queryEditor, document.querySelector(".query-errors"), {
+            check: queryService.default.checkQuery,
+            enabled: () => mode !== ABSTRACT
+        }),
+        flags: syntaxModule.attach(flagsManager.editor(), document.querySelector(".flags-errors"), {
+            check: queryService.default.checkTheory,
+            label: "Flags",
+            reveal: () => {
+                window.jQuery && window.jQuery('a[href="#flags-tab"]').tab("show");
+                document.querySelector(".flags-text").open = true;
+            }
+        })
+    };
 
     // Examples open in a tab of their own, with the current flags.
     function applyExample(example, name) {
@@ -236,8 +259,19 @@ function startup() {
         const queryText = abstract ? abstractManager.buildQuery() : queryEditor.getValue();
         if (abstract) queryEditor.setValue(queryText);
 
-        const { i, query, result } = queryService.default
-            .solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
+        let solved;
+        try {
+            solved = queryService.default.solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
+        } catch (error) {
+            // A syntax error is shown where it is, and as a card that leads there.
+            const place = error.syntax ? syntax[error.syntax.where] : null;
+            if (place) place.report(error.syntax);
+            resultManager.printError(error.syntax ? "Syntax error" : error.name || "Error",
+                error.syntax ? `${error.syntax.where}, line ${error.syntax.line}: ${error.syntax.message}` : error.message,
+                place ? () => place.report(error.syntax) : null);
+            return;
+        }
+        const { i, query, result } = solved;
 
         // Shows a solution's graph, or its labelling on the canvas. A failed
         // solution carries the graph left over from the last attempt, so the
