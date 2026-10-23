@@ -91,7 +91,11 @@ let structuredQuery = queryEditor.getValue();
 
 
 function startup() {
-    const flagsManager = flagsModule.default.init(flagsContainer, urlState.flags);
+    const flagsManager = flagsModule.default.init(flagsContainer, urlState.flags,
+        document.querySelector(".flags-form"), document.querySelector(".flags-warnings"),
+        // The form offers the same semantics as the picker of abstract mode.
+        semanticsSelector.innerHTML);
+    flagsManager.onChange(() => syncSemanticsSelector(flagsManager, { mirrorOnly: true }));
     // In abstract mode the query is derived from the drawn graph, so every
     // edit to the graph refreshes the (read only) query editor.
     const abstractManager = abstractGraphModule.default.init(abstractContainer, () => refreshAbstractQuery());
@@ -215,11 +219,12 @@ function sharesState(state) {
 }
 
 // The flags editor owns the semantics: the selector only mirrors it, and adopts
-// any labelling mode it does not know about rather than overwriting it.
-function syncSemanticsSelector(flagsManager) {
+// any labelling mode it does not know about rather than overwriting it. A
+// missing one is filled in, except while the flags are being edited.
+function syncSemanticsSelector(flagsManager, { mirrorOnly = false } = {}) {
     const current = flagsManager.flagValue(LABELLING_FLAG);
     if (current === null) {
-        flagsManager.setFlag(LABELLING_FLAG, semanticsSelector.value);
+        if (!mirrorOnly) flagsManager.setFlag(LABELLING_FLAG, semanticsSelector.value);
         return;
     }
     if (semanticsSelector.querySelector(`option[value="${CSS.escape(current)}"]`) === null) {

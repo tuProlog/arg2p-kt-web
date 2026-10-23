@@ -166,7 +166,18 @@
                         <div id="console"></div>
                     </div>
                     <div id="flags-tab" class="tab-pane">
-                        <div id="flags"></div>
+                        <div class="flags-panel">
+                            <div class="flags-warnings alert alert-warning" role="alert" hidden></div>
+                            <form class="flags-form" onsubmit="return false"></form>
+                            <details class="flags-text">
+                                <summary>Flags as text</summary>
+                                <p class="flags-text-hint">
+                                    The facts the solver is given (and links share): edit them freely,
+                                    the settings above follow.
+                                </p>
+                                <div id="flags"></div>
+                            </details>
+                        </div>
                     </div>
                 </div>
             </div>

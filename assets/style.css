@@ -174,8 +174,115 @@ body.mode-structured #graph.empty {
   word-break: break-word;
 }
 
+#flags-tab {
+  overflow-y: auto;
+}
+
+.flags-panel {
+  padding: 12px 4px;
+}
+
+.flags-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.flags-group {
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  padding: 10px 14px 4px 14px;
+  margin: 0;
+  min-width: 0;
+}
+
+.flags-group legend {
+  width: auto;
+  padding: 0 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #008080;
+}
+
+.flag {
+  margin-bottom: 12px;
+}
+
+.flag > .flag-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.flag-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 2px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.flag-check input {
+  margin-top: 4px;
+}
+
+.flag-set .flag-check {
+  margin-bottom: 6px;
+}
+
+.flag-option {
+  display: flex;
+  flex-direction: column;
+}
+
+.flag-help,
+.flag-option-help {
+  display: block;
+  color: #6c757d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.flag-option-help {
+  color: #008080;
+  margin-top: 2px;
+}
+
+.flag-switch .flag-help {
+  margin-left: 21px;
+}
+
+.flags-warnings {
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.flags-text {
+  margin-top: 8px;
+}
+
+.flags-text summary {
+  font-size: 14px;
+  cursor: pointer;
+  color: #445;
+}
+
+.flags-text-hint {
+  font-size: 12px;
+  color: #6c757d;
+  margin: 6px 0;
+}
+
 #flags {
-  height: 100%;
+  height: 220px;
+  border: 1px solid #e3e3e3;
+  border-radius: 6px;
 }
 
 .solutions-layout {
@@ -859,10 +966,6 @@ body.mode-abstract #input-panel {
     height: auto;
   }
 
-  #flags {
-    height: 50vh;
-    min-height: 240px;
-  }
 
   #con-tab {
     max-height: 70vh;
