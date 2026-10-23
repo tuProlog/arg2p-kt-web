@@ -53,6 +53,142 @@ body {
   padding: 10px 2vw 2vh 2vw;
 }
 
+/***************
+* WORKING MEMORY TABS
+***************/
+
+.doc-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: none;
+  padding: 6px 2vw 0 2vw;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.doc-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.doc-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: #555;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.doc-tab:hover {
+  background: #f1f3f5;
+}
+
+.doc-tab.active {
+  position: relative;
+  top: 1px;
+  background: #fff;
+  border-color: #dee2e6;
+  color: #212529;
+  font-weight: 500;
+}
+
+/* Abstract documents are marked, as they have no theory. */
+.doc-tab.abstract .doc-name::before {
+  content: "◇ ";
+  color: #008080;
+}
+
+.doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A double tap renames a tab rather than zooming the page. */
+.doc-tab {
+  touch-action: manipulation;
+}
+
+.doc-close {
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 16px;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.doc-close:hover {
+  background: #e2e6ea;
+  color: #212529;
+}
+
+.doc-rename {
+  width: 140px;
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+.doc-new,
+.doc-history-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  color: #555;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.doc-history-toggle svg {
+  fill: none;
+}
+
+.doc-history {
+  align-self: center;
+  margin-left: auto;
+}
+
+.doc-history-menu {
+  min-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.doc-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.doc-history-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-history-when,
+.doc-history-empty {
+  color: #888;
+  white-space: nowrap;
+}
+
+.theory-actions {
+  display: flex;
+  gap: 6px;
+}
+
 #input-panel {
   flex-direction: column;
   width: 28%;
@@ -938,6 +1074,14 @@ body.mode-abstract #input-panel {
     padding: 8px 12px 16px 12px;
   }
 
+  .doc-bar {
+    padding: 6px 12px 0 12px;
+  }
+
+  .doc-tab {
+    max-width: 160px;
+  }
+
   #input-panel,
   #solutions {
     resize: none;
@@ -1017,6 +1161,19 @@ body.mode-abstract #input-panel {
 
 /* Larger touch targets for coarse pointers, whatever the screen size. */
 @media (pointer: coarse) {
+  .doc-tab {
+    padding: 6px 2px 6px 12px;
+  }
+
+  .doc-close {
+    padding: 6px 9px;
+  }
+
+  .doc-new,
+  .doc-history-toggle {
+    padding: 6px 12px;
+  }
+
   .navbar-nav .nav-link,
   .dropdown-item {
     padding-top: 10px;
@@ -1277,6 +1434,41 @@ body.mode-abstract #input-panel {
 
 :root[data-theme="dark"] #abstract-editor .vis-separator-line {
   background: var(--border);
+}
+
+/* Working memory tabs */
+:root[data-theme="dark"] .doc-bar {
+  border-bottom-color: var(--border);
+}
+
+:root[data-theme="dark"] .doc-tab {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .doc-tab:hover,
+:root[data-theme="dark"] .doc-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .doc-tab.active {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .doc-tab.abstract .doc-name::before {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .doc-new,
+:root[data-theme="dark"] .doc-history-toggle {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .doc-new:hover,
+:root[data-theme="dark"] .doc-history-toggle:hover {
+  color: var(--text);
 }
 
 /* The theme toggle in the navbar */

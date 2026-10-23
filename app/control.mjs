@@ -10,11 +10,13 @@ import * as queryService from './service/queryService.mjs';
 import urlParamsService from './service/urlParamsService.mjs';
 import examples from './examples.mjs';
 import themeModule from './modules/themeModule.mjs';
+import workspaceModule from './modules/workspaceModule.mjs';
 
 const STRUCTURED = urlParamsService.STRUCTURED;
 const ABSTRACT = urlParamsService.ABSTRACT;
 
 const DEFAULT_QUERY = 'arg2p::solve';
+const EMPTY_GRAPH = { arguments: [], attacks: [] };
 const LABELLING_FLAG = 'argumentLabellingMode';
 
 const theoryField = document.querySelector("#theory");
@@ -99,9 +101,19 @@ function startup() {
         // The form offers the same semantics as the picker of abstract mode.
         semanticsSelector.innerHTML);
     flagsManager.onChange(() => syncSemanticsSelector(flagsManager, { mirrorOnly: true }));
+    // Every edit of the theory, query, flags, graph or mode is saved in the
+    // working memory (shortly after, see workspaceModule).
+    let workspace = null;
+    const edited = () => { if (workspace !== null) workspace.changed(); };
     // In abstract mode the query is derived from the drawn graph, so every
     // edit to the graph refreshes the (read only) query editor.
-    const abstractManager = abstractGraphModule.default.init(abstractContainer, () => refreshAbstractQuery());
+    const abstractManager = abstractGraphModule.default.init(abstractContainer, () => {
+        refreshAbstractQuery();
+        edited();
+    });
+    theoryEditor.onDidChangeModelContent(edited);
+    queryEditor.onDidChangeModelContent(edited);
+    flagsManager.onChange(edited);
 
     function refreshAbstractQuery() {
         if (mode !== ABSTRACT) return;
@@ -130,6 +142,7 @@ function startup() {
             if (leavingAbstract) queryEditor.setValue(structuredQuery);
             if (queryEditor.getValue().trim() === "") queryEditor.setValue(DEFAULT_QUERY);
         }
+        edited();
     }
 
     // The results belong to the mode they were computed in, so switching mode
@@ -142,15 +155,12 @@ function startup() {
         abstractManager.resetLabelling();
     }
 
-    function applyExample(example) {
-        if (example.mode === ABSTRACT) abstractManager.setGraph(example.abstractGraph);
-        else {
-            theoryEditor.setValue(example.theory);
-            // Also the one restored when coming from abstract mode.
-            structuredQuery = example.query;
-            queryEditor.setValue(example.query);
-        }
-        applyMode(example.mode);
+    // Examples open in a tab of their own, with the current flags.
+    function applyExample(example, name) {
+        workspace.open(example.mode === ABSTRACT
+            ? { mode: ABSTRACT, theory: "", query: DEFAULT_QUERY, flags: flagsManager.flags(), abstractGraph: example.abstractGraph }
+            : { mode: STRUCTURED, theory: example.theory, query: example.query, flags: flagsManager.flags(), abstractGraph: EMPTY_GRAPH },
+        name);
     }
 
     function currentState() {
@@ -163,9 +173,47 @@ function startup() {
         };
     }
 
+    // A document of the working memory, as the editors show it. In abstract
+    // mode the query editor holds the generated query: the document keeps
+    // the structured one.
+    function currentDocument() {
+        return { ...currentState(), query: mode === ABSTRACT ? structuredQuery : queryEditor.getValue() };
+    }
+
+    // Puts a document in the editors, without the results of the last one.
+    function showDocument(doc) {
+        theoryEditor.setValue(doc.theory || "");
+        flagsManager.setFlags(doc.flags || DEFAULT_FLAGS);
+        abstractManager.setGraph(doc.abstractGraph || EMPTY_GRAPH);
+        structuredQuery = doc.query || DEFAULT_QUERY;
+        queryEditor.setValue(structuredQuery);
+        clearResults();
+        applyMode(doc.mode === ABSTRACT ? ABSTRACT : STRUCTURED);
+        syncSemanticsSelector(flagsManager, { mirrorOnly: true });
+    }
+
+    workspace = workspaceModule.init({
+        bar: document.querySelector(".doc-bar"),
+        read: currentDocument,
+        show: showDocument,
+        blank: () => ({ mode: STRUCTURED, theory: "", query: DEFAULT_QUERY, flags: DEFAULT_FLAGS, abstractGraph: EMPTY_GRAPH })
+    });
+    // The last session's tabs (or Tweety, the first time). A shared link opens
+    // in a tab of its own, so that it never overwrites the user's work, and
+    // leaves the address bar: a reload does not open it again.
+    workspace.restore(() => ({ mode: STRUCTURED, theory: examples.tweety.theory, query: DEFAULT_QUERY, flags: DEFAULT_FLAGS, abstractGraph: EMPTY_GRAPH }), "Tweety");
+    if (sharesState(urlState)) {
+        const sharedMode = urlState.mode !== null ? urlState.mode : STRUCTURED;
+        workspace.open({
+            mode: sharedMode,
+            theory: urlState.theory !== null ? urlState.theory : (sharedMode === ABSTRACT ? "" : examples.tweety.theory),
+            query: urlState.query !== null ? urlState.query : DEFAULT_QUERY,
+            flags: urlState.flags !== null ? urlState.flags : DEFAULT_FLAGS,
+            abstractGraph: urlState.abstractGraph !== null ? urlState.abstractGraph : EMPTY_GRAPH
+        }, "Shared link");
+        window.history.replaceState(null, "", window.location.pathname);
+    }
     syncSemanticsSelector(flagsManager);
-    if (urlState.abstractGraph !== null) abstractManager.setGraph(urlState.abstractGraph);
-    applyMode(mode);
     reportUrlErrors(urlState.errors);
 
     setListeners(applyMode, applyExample, currentState, flagsManager, _ => {
@@ -210,7 +258,7 @@ function startup() {
             if (solution.res === "yes" || !answered) show(solution)
             answered = true
         }, { hideExhaustedNo: abstract, onShow: show });
-    });
+    }, workspace, currentDocument);
 
     // A shared link opens on its result: it is run as if RUN had been pressed,
     // once the page has been drawn. A plain visit runs nothing visible, but
@@ -268,7 +316,7 @@ function reportUrlErrors(errors) {
     }
 }
 
-function setListeners(applyMode, applyExample, currentState, flagsManager, solveAction) {
+function setListeners(applyMode, applyExample, currentState, flagsManager, solveAction, workspace, currentDocument) {
     document.querySelector("button.solve")
         .addEventListener("click", () => {
             try {
@@ -284,7 +332,8 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
         .addEventListener("change", e => {
             const file = e.target.files[0];
             if (file === undefined) return;
-            readFile(file, text => theoryEditor.setValue(text));
+            // In a tab of its own, named after the file.
+            readFile(file, text => workspace.open({ ...currentDocument(), mode: STRUCTURED, theory: text }, file.name));
             // Cleared so that picking the same file again reloads it.
             e.target.value = "";
         });
@@ -299,10 +348,13 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
     document.querySelectorAll(".example").forEach(link => {
         link.addEventListener("click", e => {
             e.preventDefault();
-            applyExample(examples[link.dataset.example]);
+            applyExample(examples[link.dataset.example], link.innerText.trim());
             closeMenu();
         });
     });
+
+    document.querySelector(".save-theory").addEventListener("click", () =>
+        download(fileName(workspace.active().name), theoryEditor.getValue()));
 
     semanticsSelector.addEventListener("change", () =>
         flagsManager.setFlag(LABELLING_FLAG, semanticsSelector.value));
@@ -362,6 +414,23 @@ function legacyCopy() {
     } catch (error) {
         return false;
     }
+}
+
+// The tab's name as a file name: `Tweety` -> `Tweety.pl`, `rules.pl` as it is.
+function fileName(name) {
+    const safe = name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "theory";
+    return /\.(pl|pro|prolog|txt)$/i.test(safe) ? safe : `${safe}.pl`;
+}
+
+function download(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function readFile(file, cb) {

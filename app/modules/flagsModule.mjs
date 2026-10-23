@@ -33,7 +33,7 @@ function FlagsModule() {
             listeners.forEach(listener => listener())
         })
         refreshForm()
-        return { flags, setFlag, flagValue, onChange }
+        return { flags, setFlag, flagValue, onChange, setFlags }
     }
 
     function prepareContainer(container, initialFlags) {
@@ -67,6 +67,11 @@ function FlagsModule() {
     // so that the flags text stays the single source of truth.
     function setFlag(name, value) {
         update(text => setValue(text, name, value))
+    }
+
+    // Replaces all the flags (another document of the working memory).
+    function setFlags(text) {
+        if (text !== flags()) editor.setValue(text)
     }
 
     function onChange(listener) {

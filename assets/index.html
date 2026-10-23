@@ -106,12 +106,24 @@
             <span class="navbar-text version">VERSION</span>
         </div>
     </nav>
+    <!-- The working memory: one tab per theory, kept in the browser. -->
+    <div class="doc-bar">
+        <div class="doc-tabs" role="tablist" aria-label="Open theories"></div>
+        <button type="button" class="btn btn-sm doc-new" title="New theory" aria-label="New theory">+</button>
+        <div class="dropdown doc-history">
+            <button type="button" class="btn btn-sm doc-history-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Recently closed theories" aria-label="Recently closed theories"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+            <div class="dropdown-menu dropdown-menu-right doc-history-menu"></div>
+        </div>
+    </div>
     <main class="workspace">
         <section id="input-panel">
             <div class="panel-header">
                 <label for="theory">Theory :</label>
                 <!-- The label is the visible button: the native file input is hidden. -->
-                <label for="inputFile" class="btn btn-sm btn-outline-secondary load-theory" title="Replace the theory with the content of a local file">Load file</label>
+                <div class="theory-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary save-theory" title="Download the theory as a .pl file">Save</button>
+                    <label for="inputFile" class="btn btn-sm btn-outline-secondary load-theory" title="Open a local file in a new tab">Load file</label>
+                </div>
                 <input type="file" id="inputFile" name="myfile" class="d-none" accept=".pl,.pro,.prolog,.txt,text/plain">
             </div>
             <div id="theory" name="theory"></div>
