@@ -181,11 +181,14 @@ function GraphModule() {
         updateStages()
     }
 
+    // The graph of a stage comes from the solver worker: a later click wins.
     function showStage(target) {
         if (result === null || target < 0 || target > lastStage) return
         stage = target
-        printGraph(result.graphAt(stage))
         updateStages()
+        Promise.resolve(result.graphAt(target)).then(graph => {
+            if (stage === target) printGraph(graph)
+        })
     }
 
     function updateStages() {

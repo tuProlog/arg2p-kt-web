@@ -14,6 +14,7 @@ import workspaceModule from './modules/workspaceModule.mjs';
 import syntaxModule from './modules/syntaxModule.mjs';
 import files from './modules/files.mjs';
 import afFormats from './service/afFormats.mjs';
+import solverClient from './service/solverClient.mjs';
 
 const STRUCTURED = urlParamsService.STRUCTURED;
 const ABSTRACT = urlParamsService.ABSTRACT;
@@ -242,7 +243,6 @@ function startup() {
     reportUrlErrors(urlState.errors);
 
     setListeners(applyMode, applyExample, currentState, flagsManager, _ => {
-        solvedOnce = true;
         // The mode is captured here: switching it while solutions are still being
         // enumerated must not change where the pending ones are rendered.
         const abstract = mode === ABSTRACT;
@@ -263,62 +263,63 @@ function startup() {
         const queryText = abstract ? abstractManager.buildQuery() : queryEditor.getValue();
         if (abstract) queryEditor.setValue(queryText);
 
-        let solved;
-        try {
-            solved = queryService.default.solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer());
-        } catch (error) {
-            // A syntax error is shown where it is, and as a card that leads there.
-            const place = error.syntax ? syntax[error.syntax.where] : null;
-            if (place) place.report(error.syntax);
-            resultManager.printError(error.syntax ? "Syntax error" : error.name || "Error",
-                error.syntax ? `${error.syntax.where}, line ${error.syntax.line}: ${error.syntax.message}` : error.message,
-                place ? () => place.report(error.syntax) : null);
-            return;
-        }
-        const { i, query, result } = solved;
-
-        // Shows a solution's graph, or its labelling on the canvas. A failed
-        // solution carries the graph left over from the last attempt, so the
-        // canvas is only recoloured on an actual labelling.
-        const show = solution => {
-            if (graphManager !== null) graphManager.showSolution(solution, result)
-            else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
+        // The solver works in a worker (see solverClient): the overlay offers
+        // to stop it meanwhile. A run replaced by a newer one is ignored.
+        const run = ++runs;
+        overlay(true);
+        const stopped = error => {
+            overlay(false);
+            resultManager.printError(error.stopped ? "Stopped" : error.name || "Error",
+                error.stopped ? "The query was stopped before it gave an answer." : error.message);
         };
+        solverClient.solve(theoryText, queryText, flagsManager.flags(), consoleManager.outputConsumer()).then(solved => {
+            if (run !== runs) return;
+            const { i, query, result } = solved;
 
-        // The final "no more solutions" keeps the graph of the last solution on
-        // screen, the one its card shows as selected. A first answer always
-        // shows its graph, even a failure.
-        let answered = false;
-        resultManager.printSolution(i, query, () => {
-            document.querySelector(".overlay").style.display = "flex"
-        }, solution => {
-            document.querySelector(".overlay").style.display = "none"
-            if (solution.res === "yes" || !answered) show(solution)
-            answered = true
-        }, { hideExhaustedNo: abstract, onShow: show });
+            // Shows a solution's graph, or its labelling on the canvas. A failed
+            // solution carries the graph left over from the last attempt, so the
+            // canvas is only recoloured on an actual labelling.
+            const show = solution => {
+                if (graphManager !== null) graphManager.showSolution(solution, result)
+                else if (solution.res === "yes") abstractManager.applyLabelling(solution.graph)
+            };
+
+            // The final "no more solutions" keeps the graph of the last solution on
+            // screen, the one its card shows as selected. A first answer always
+            // shows its graph, even a failure.
+            let answered = false;
+            resultManager.printSolution(i, query, () => overlay(true), solution => {
+                overlay(false)
+                if (solution.res === "yes" || !answered) show(solution)
+                answered = true
+            }, { hideExhaustedNo: abstract, onShow: show, onFail: stopped });
+        }, error => {
+            if (run !== runs) return;
+            if (error.stopped || !error.syntax) return stopped(error);
+            // A syntax error is shown where it is, and as a card that leads there.
+            overlay(false);
+            const place = syntax[error.syntax.where];
+            place.report(error.syntax);
+            resultManager.printError("Syntax error", `${error.syntax.where}, line ${error.syntax.line}: ${error.syntax.message}`,
+                () => place.report(error.syntax));
+        });
     }, workspace, currentDocument, abstractManager);
 
     // A shared link opens on its result: it is run as if RUN had been pressed,
     // once the page has been drawn. A plain visit runs nothing visible, but
     // warms the solver up.
+    // The solver worker warms itself up as it starts (the first solve is much
+    // slower than the next ones), in the background: the page is not held.
     if (sharesState(urlState)) setTimeout(() => document.querySelector("button.solve").click(), 0);
-    else whenIdle(warmUp);
+    else whenIdle(() => solverClient.start());
+    document.querySelector(".solving-stop").addEventListener("click", () => solverClient.stop());
 }
 
-// The first solve is much slower than the next ones (about 0.8s against 0.2s
-// for Tweety): the solver's code is compiled and initialised on first use.
-// One is run, unseen, once the page is idle, so that the first RUN takes as
-// long as the following ones. Not when the user has already run something.
-let solvedOnce = false;
+// Runs started: a newer one replaces the older ones' results.
+let runs = 0;
 
-function warmUp() {
-    if (solvedOnce) return;
-    try {
-        const { i } = queryService.default.solve(examples.tweety.theory, DEFAULT_QUERY, DEFAULT_FLAGS, () => { });
-        if (i.hasNext()) i.next();
-    } catch (error) {
-        // Only a warm-up: nothing to report.
-    }
+function overlay(visible) {
+    document.querySelector(".overlay").style.display = visible ? "flex" : "none";
 }
 
 function whenIdle(task) {

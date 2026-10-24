@@ -814,7 +814,7 @@ body.mode-structured #graph {
   z-index: 2000;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.6);
   /* Short solves are over before it shows, instead of flashing. */
   animation: overlay-in 0.25s ease 0.15s both;
 }
@@ -824,11 +824,16 @@ body.mode-structured #graph {
   to { opacity: 1; }
 }
 
+/* A card of its own, so it reads over whatever the page shows. */
 .solving {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  padding: 22px 36px 20px 36px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 
 .solving-label {
@@ -1465,7 +1470,12 @@ body.mode-abstract #input-panel {
 }
 
 :root[data-theme="dark"] .overlay {
-  background: rgba(23, 24, 27, 0.75);
+  background: rgba(23, 24, 27, 0.6);
+}
+
+:root[data-theme="dark"] .solving {
+  background: var(--surface);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme="dark"] .share-dialog {

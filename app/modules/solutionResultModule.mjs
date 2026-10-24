@@ -206,29 +206,25 @@ function SolutionResultModule() {
         return items;
     }
 
+    // The next solution comes from the solver worker (a promise): the page
+    // stays responsive meanwhile, and the query can be stopped, in which case
+    // `settings.onFail` is told why. A run replaced meanwhile is ignored.
     function printNext(iterator, list, beforeNext, afterNext, settings, run) {
         if (!iterator.hasNext()) return;
         nextButton.disabled = true;
         beforeNext()
-        new Promise((resolve, reject) => {
-            // The solver blocks the page: it starts once the overlay has been
-            // painted, so that its animation is already running meanwhile.
-            afterNextPaint(() => {
-                let solution = iterator.next()
-                addDomSolution(solution, list, settings, run);
-                resolve(solution)
-            })
-        }).then(sol => {
+        Promise.resolve(iterator.next()).then(solution => {
+            if (run !== activeRun) return;
+            addDomSolution(solution, list, settings, run);
             // Checked once the solution is consumed, so Next is only offered
-            // when there really is another one. A run replaced in the meantime
-            // no longer owns the button.
-            if (run === activeRun) nextButton.disabled = !iterator.hasNext();
-            afterNext(sol)
+            // when there really is another one.
+            nextButton.disabled = !iterator.hasNext();
+            afterNext(solution)
+        }, error => {
+            if (run !== activeRun) return;
+            nextButton.disabled = true;
+            if (settings.onFail) settings.onFail(error);
         })
-    }
-
-    function afterNextPaint(callback) {
-        requestAnimationFrame(() => requestAnimationFrame(callback));
     }
 
     return { init }
