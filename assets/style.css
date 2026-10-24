@@ -1073,6 +1073,45 @@ body.mode-abstract #input-panel {
   background: #fdf0f0;
 }
 
+/* Import and export of frameworks, above the canvas. */
+.abstract-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.abstract-bar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.abstract-note {
+  margin-right: auto;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.abstract-note.error {
+  color: #b00020;
+}
+
+.graph-png {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  margin-left: auto;
+}
+
+.graph-png + .graph-stages {
+  margin-left: 0;
+}
+
 .abstract-hint {
   font-size: 12px;
   color: #808080;
@@ -1505,6 +1544,10 @@ body.mode-abstract #input-panel {
 :root[data-theme="dark"] .doc-new:hover,
 :root[data-theme="dark"] .doc-history-toggle:hover {
   color: var(--text);
+}
+
+:root[data-theme="dark"] .abstract-note.error {
+  color: #f08c96;
 }
 
 /* The theme toggle in the navbar */

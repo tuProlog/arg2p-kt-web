@@ -181,6 +181,19 @@
                             <div id="solutions" class="trivial"></div>
                             <div id="graph" class="structured-only"></div>
                             <div id="abstract-panel" class="abstract-only flex-column">
+                                <div class="abstract-bar">
+                                    <span class="abstract-note" hidden></span>
+                                    <label for="afFile" class="btn btn-sm btn-outline-secondary" title="Open a framework in APX, TGF or ICCMA'23 format, in a new tab">Import…</label>
+                                    <input type="file" id="afFile" class="d-none" accept=".apx,.tgf,.af,.i23,.txt">
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Download the framework"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            <button type="button" class="dropdown-item export-af" data-format="apx">APX <small>(ICCMA, ASPARTIX)</small></button>
+                                            <button type="button" class="dropdown-item export-af" data-format="tgf">TGF <small>(ICCMA)</small></button>
+                                            <button type="button" class="dropdown-item export-af" data-format="png">PNG picture</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="abstract-editor"></div>
                                 <p class="abstract-hint">
                                     Use the toolbar to add arguments and attacks, and double click

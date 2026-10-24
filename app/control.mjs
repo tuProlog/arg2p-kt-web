@@ -12,6 +12,8 @@ import examples from './examples.mjs';
 import themeModule from './modules/themeModule.mjs';
 import workspaceModule from './modules/workspaceModule.mjs';
 import syntaxModule from './modules/syntaxModule.mjs';
+import files from './modules/files.mjs';
+import afFormats from './service/afFormats.mjs';
 
 const STRUCTURED = urlParamsService.STRUCTURED;
 const ABSTRACT = urlParamsService.ABSTRACT;
@@ -248,7 +250,9 @@ function startup() {
         const resultManager = solutionResultModule.default.init(solutionsList, nextButton);
         const consoleManager = consoleModule.default.init(outputConsole);
         // Abstract mode draws the labelling onto the editable canvas instead.
-        const graphManager = abstract ? null : graphModule.default.init(graphContainer);
+        const graphManager = abstract ? null : graphModule.default.init(graphContainer, {
+            fileName: () => workspace.active().name
+        });
 
         consoleManager.clear()
         if (graphManager !== null) graphManager.clear()
@@ -292,7 +296,7 @@ function startup() {
             if (solution.res === "yes" || !answered) show(solution)
             answered = true
         }, { hideExhaustedNo: abstract, onShow: show });
-    }, workspace, currentDocument);
+    }, workspace, currentDocument, abstractManager);
 
     // A shared link opens on its result: it is run as if RUN had been pressed,
     // once the page has been drawn. A plain visit runs nothing visible, but
@@ -350,7 +354,7 @@ function reportUrlErrors(errors) {
     }
 }
 
-function setListeners(applyMode, applyExample, currentState, flagsManager, solveAction, workspace, currentDocument) {
+function setListeners(applyMode, applyExample, currentState, flagsManager, solveAction, workspace, currentDocument, abstractManager) {
     document.querySelector("button.solve")
         .addEventListener("click", () => {
             try {
@@ -387,8 +391,39 @@ function setListeners(applyMode, applyExample, currentState, flagsManager, solve
         });
     });
 
+    // Abstract frameworks: import (in a new tab) and export, in the ICCMA formats.
+    const note = document.querySelector(".abstract-note");
+    const say = (text, error = false) => {
+        note.innerText = text;
+        note.classList.toggle("error", error);
+        note.hidden = text === "";
+    };
+    document.querySelector("#afFile").addEventListener("change", e => {
+        const file = e.target.files[0];
+        if (file === undefined) return;
+        readFile(file, text => {
+            try {
+                const framework = afFormats.parse(text);
+                workspace.open({ ...currentDocument(), mode: ABSTRACT, theory: "",
+                    abstractGraph: { arguments: framework.arguments, attacks: framework.attacks } }, file.name);
+                say(framework.renamed.length === 0 ? "" : `Renamed to Prolog atoms: ${framework.renamed.slice(0, 4)
+                    .map(it => `${it.from} → ${it.to}`).join(", ")}${framework.renamed.length > 4 ? ` and ${framework.renamed.length - 4} more` : ""}`);
+            } catch (error) {
+                say(`Could not read ${file.name}: ${error.message}`, true);
+            }
+        });
+        e.target.value = "";
+    });
+    document.querySelectorAll(".export-af").forEach(item => item.addEventListener("click", () => {
+        const name = workspace.active().name;
+        const format = item.dataset.format;
+        if (format === "png") files.downloadUrl(files.fileName(name, "png"), abstractManager.png());
+        else files.downloadText(files.fileName(name, format),
+            format === "apx" ? afFormats.toApx(abstractManager.graph()) : afFormats.toTgf(abstractManager.graph()));
+    }));
+
     document.querySelector(".save-theory").addEventListener("click", () =>
-        download(fileName(workspace.active().name), theoryEditor.getValue()));
+        files.downloadText(files.fileName(workspace.active().name, "pl", ["pro", "prolog", "txt"]), theoryEditor.getValue()));
 
     semanticsSelector.addEventListener("change", () =>
         flagsManager.setFlag(LABELLING_FLAG, semanticsSelector.value));
@@ -448,23 +483,6 @@ function legacyCopy() {
     } catch (error) {
         return false;
     }
-}
-
-// The tab's name as a file name: `Tweety` -> `Tweety.pl`, `rules.pl` as it is.
-function fileName(name) {
-    const safe = name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "theory";
-    return /\.(pl|pro|prolog|txt)$/i.test(safe) ? safe : `${safe}.pl`;
-}
-
-function download(name, text) {
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function readFile(file, cb) {

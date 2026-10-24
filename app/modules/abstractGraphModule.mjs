@@ -1,3 +1,4 @@
+import files from './files.mjs';
 import * as vis from "vis-network/standalone/esm/vis-network.js"
 import { labelColor, UNLABELLED_COLOR } from './palette.mjs';
 import abstractQueryService from '../service/abstractQueryService.mjs';
@@ -25,7 +26,7 @@ function AbstractGraphModule() {
         network.on("doubleClick", params => {
             if (params.nodes.length === 1) startRename(params.nodes[0]);
         });
-        return { setGraph, graph, buildQuery, applyLabelling, resetLabelling, clear, resize }
+        return { setGraph, graph, buildQuery, applyLabelling, resetLabelling, clear, resize, png }
     }
 
     function networkOptions() {
@@ -223,6 +224,11 @@ function AbstractGraphModule() {
 
     function resetLabelling() {
         nodes.update(nodes.getIds().map(it => ({ id: it, color: UNLABELLED_COLOR })));
+    }
+
+    // The whole graph as a PNG (see files.graphPng).
+    function png() {
+        return files.graphPng(network, editor);
     }
 
     function changed() {

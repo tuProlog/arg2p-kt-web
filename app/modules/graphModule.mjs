@@ -2,6 +2,7 @@ import * as vis from "vis-network/standalone/esm/vis-network.js"
 import { labelColor } from './palette.mjs';
 import { parseDescriptor, supportsOf, levelsOf } from './argumentDescriptor.mjs';
 import { layeredLayout } from './layeredLayout.mjs';
+import files from './files.mjs';
 
 const SUPPORTS_SETTING = "arg2p.showSupports";
 const CONCLUSIONS_SETTING = "arg2p.showConclusions";
@@ -54,7 +55,8 @@ function GraphModule() {
     let shown = null;
     let pinned = null;
 
-    function init(container) {
+    // `options.fileName()`: the name of the picture the graph is saved as.
+    function init(container, options = {}) {
         panel = container
         prepareContainer(container)
         popup = container.querySelector(".argument-popup")
@@ -106,6 +108,9 @@ function GraphModule() {
         })
         container.querySelector(".stage-previous").addEventListener("click", () => showStage(stage - 1))
         container.querySelector(".stage-next").addEventListener("click", () => showStage(stage + 1))
+        container.querySelector(".graph-png").addEventListener("click", () =>
+            files.downloadUrl(files.fileName(options.fileName ? options.fileName() : "graph", "png"),
+                files.graphPng(network, container.querySelector("#graph-visual"))))
         return { printGraph, showSolution, clear }
     }
 
@@ -149,6 +154,7 @@ function GraphModule() {
                         conclusions
                     </label>
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary graph-png" title="Download the graph as a picture"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> PNG</button>
                 <div class="graph-stages" hidden>
                     <button class="btn btn-sm btn-outline-secondary stage-previous" title="Previous stage of the computation" aria-label="Previous stage">&#9664;</button>
                     <span class="stage-label" title="Every step of the computation keeps its own context: browse them to see how the graph is built"></span>
