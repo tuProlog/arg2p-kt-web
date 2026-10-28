@@ -4,7 +4,7 @@ import '../share.js';
 import { controls } from '../styles.js';
 import { workerCount, type Federation, type FederationStats } from './federation.js';
 import { codeIn, followPairingLinks, type PairingKind, type PairingLink } from './links.js';
-import { DEFAULT_RELAY, messageOf, type Joined } from './pairing.js';
+import { DEFAULT_RELAY, decodeInvitation, decodeReply, messageOf, type Joined } from './pairing.js';
 import { qrSvg, scanQr } from './qr.js';
 
 /** Where a pairing is, as this device shows it */
@@ -207,9 +207,15 @@ export class Arg2pFederation extends LitElement {
             await scanQr(
                 video,
                 text => {
+                    // another QR code: the camera looks on
+                    if (!isPairing(text, kind)) {
+                        this.tell(kind === 'reply' ? 'That QR code is no reply link: still looking.' : 'That QR code is no invitation: still looking.', true);
+                        return false;
+                    }
                     this.scanning = null;
                     if (kind === 'reply') void this.take(text, back);
                     else void this.join(text);
+                    return true;
                 },
                 scan.signal,
             );
@@ -535,6 +541,12 @@ export class Arg2pFederation extends LitElement {
             }
         `,
     ];
+}
+
+// Whether [text], scanned, is a link of a pairing of [kind] (or its code)
+function isPairing(text: string, kind: PairingKind): boolean {
+    const code = codeIn(text, kind);
+    return code !== null && (kind === 'reply' ? decodeReply(code) : decodeInvitation(code)) !== null;
 }
 
 customElements.define('arg2p-federation', Arg2pFederation);

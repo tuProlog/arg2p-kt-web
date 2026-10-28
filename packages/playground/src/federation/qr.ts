@@ -34,11 +34,11 @@ async function reader(): Promise<(video: HTMLVideoElement) => Promise<string | n
 }
 
 /**
- * Shows the camera (the one at the back, on a phone) in [video], and gives [found] the first QR code it reads, until
- * [signal] aborts it. Fails if there is no camera, the user refuses it, or it is aborted before it shows; the camera is
- * let go whenever it stops.
+ * Shows the camera (the one at the back, on a phone) in [video], and gives [found] the QR codes it reads, until one is
+ * what it looks for (found tells) or [signal] aborts it. Fails if there is no camera, the user refuses it, or it is
+ * aborted before it shows; the camera is let go whenever it stops.
  */
-export async function scanQr(video: HTMLVideoElement, found: (text: string) => void, signal: AbortSignal): Promise<void> {
+export async function scanQr(video: HTMLVideoElement, found: (text: string) => boolean, signal: AbortSignal): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     const stop = () => {
         stream.getTracks().forEach(track => track.stop());
@@ -65,9 +65,8 @@ export async function scanQr(video: HTMLVideoElement, found: (text: string) => v
         if (signal.aborted) return;
         const text = await read(video).catch(() => null);
         if (signal.aborted) return;
-        if (text !== null) {
+        if (text !== null && found(text)) {
             stop();
-            found(text);
             return;
         }
         setTimeout(next, 150);
