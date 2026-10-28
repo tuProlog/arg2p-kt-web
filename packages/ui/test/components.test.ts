@@ -298,6 +298,21 @@ describe('<arg2p-framework>', function () {
         ok(editor.drawing!.getElementById('bee').nonempty());
     });
 
+    it('should tell about an argument tapped: its label, what attacks it, what it attacks', async function () {
+        const { editor } = await framework();
+        editor.graph = ABSTRACT;
+        await editor.updateComplete;
+        editor.drawing!.getElementById('b').emit('tap');
+        await editor.updateComplete;
+        const popup = editor.shadowRoot!.querySelector('.popup')!.textContent!.replace(/\s+/g, ' ');
+        ok(popup.includes('out'), popup);
+        ok(/Attacked by ?a ?x/.test(popup), popup);
+        ok(/Attacks ?none/.test(popup), popup);
+        editor.drawing!.emit('tap');
+        await editor.updateComplete;
+        equal(editor.shadowRoot!.querySelector('.popup'), null);
+    });
+
     it('should bend mutual attacks apart, so that both show', async function () {
         const { editor } = await framework('graphBuildMode(abstract).\na <-> b.\nb -> c.\n');
         const cy = editor.drawing!;

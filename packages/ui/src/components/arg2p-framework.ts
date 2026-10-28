@@ -1,4 +1,4 @@
-import type { Core, EventObject, NodeSingular, StylesheetJson } from 'cytoscape';
+import type { Core, EdgeSingular, EventObject, NodeSingular, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
@@ -70,6 +70,7 @@ export class Arg2pFramework extends LitElement {
         mode: { state: true },
         selected: { state: true },
         renaming: { state: true },
+        shown: { state: true },
         source: { state: true },
         derived: { state: true },
     };
@@ -87,6 +88,9 @@ export class Arg2pFramework extends LitElement {
     private mode: Mode = 'select';
     private selected = false;
     private renaming: { name: string; value: string } | null = null;
+    // the argument the popup is about: hovered, or tapped to keep it open
+    private shown: string | null = null;
+    private pinned: string | null = null;
     // the attacker picked, in attack mode
     private source: string | null = null;
     // whether the graph adds to the framework what the theory derives
@@ -132,7 +136,12 @@ export class Arg2pFramework extends LitElement {
         cy.on('select unselect', () => {
             this.selected = cy.$(':selected').nonempty();
         });
-        cy.on('viewport position', () => this.placeRename());
+        cy.on('viewport position', () => {
+            this.placeRename();
+            this.placePopup();
+        });
+        cy.on('mouseover', 'node', (event: EventObject) => (this.shown = event.target.id()));
+        cy.on('mouseout', 'node', () => (this.shown = this.pinned));
         this.cy = cy;
         this.unfollow = followSize(cy, this.renderRoot.querySelector<HTMLElement>('.canvas')!);
         this.draw();
@@ -145,6 +154,7 @@ export class Arg2pFramework extends LitElement {
 
     protected override updated(changed: PropertyValues): void {
         if (changed.has('theory') || changed.has('graph')) this.draw();
+        if (changed.has('shown') || changed.has('graph')) this.placePopup();
         // placed elsewhere (by the graph of the framework): moved there
         else if (changed.has('positions') && this.cy !== null && placeByName(this.cy, idOf, this.positions)) this.tellPositions();
         if (changed.has('readonly')) {
@@ -187,7 +197,7 @@ export class Arg2pFramework extends LitElement {
             .filter((it): it is { from: string; to: string } => it.from !== undefined && it.to !== undefined && !attacks.has(`${it.from}->${it.to}`));
         const outline = getComputedStyle(this).getPropertyValue('--_accent').trim() || '#008080';
         const nodes = [...this.drawn.arguments, ...[...labels.keys()].filter(it => !declared.has(it))].map(name => ({
-            data: { id: name, color: labelColor(this, labels.get(name)), outline, ...nodeSize(name) },
+            data: { id: name, label: labels.get(name) ?? 'na', color: labelColor(this, labels.get(name)), outline, ...nodeSize(name) },
             classes: declared.has(name) ? '' : 'derived',
         }));
         const attackColor = (from: string) => (labels.has(from) ? labelColor(this, labels.get(from)) : labelColor(this, null));
@@ -222,6 +232,7 @@ export class Arg2pFramework extends LitElement {
         if (laid || cy.nodes().some(it => !told.has((it as NodeSingular).id())) || told.size !== cy.nodes().length) this.tellPositions();
         if (first && cy.nodes().nonempty()) fit(cy);
         if (this.source !== null && cy.getElementById(this.source).empty()) this.source = null;
+        if (this.shown !== null && cy.getElementById(this.shown).empty()) this.shown = this.pinned = null;
     }
 
     // Where the arguments are now, for the graph of the framework to place them alike
@@ -235,6 +246,10 @@ export class Arg2pFramework extends LitElement {
         const cy = this.cy!;
         if (this.readonly) return;
         const onNode = event.target !== cy && event.target.isNode();
+        if (this.mode === 'select') {
+            this.pinned = onNode ? (event.target.id() as string) : null;
+            this.shown = this.pinned;
+        }
         if (this.mode === 'argument' && event.target === cy) this.add(event.position);
         else if (this.mode === 'attack') {
             if (!onNode) return this.pick(null);
@@ -323,6 +338,48 @@ export class Arg2pFramework extends LitElement {
     }
 
     // The rename box stays on its node while the drawing moves
+    // Next to its node, flipped to the other side or held in when it would leave the area
+    private placePopup(): void {
+        const popup = this.renderRoot.querySelector<HTMLElement>('.popup');
+        const area = this.renderRoot.querySelector<HTMLElement>('.area');
+        const node = this.shown === null ? null : this.cy?.getElementById(this.shown);
+        if (popup === null || area === null || node == null || node.empty()) return;
+        const point = node.renderedPosition();
+        const margin = 8;
+        const gap = node.renderedWidth() / 2 + 8;
+        let left = point.x + gap;
+        if (left + popup.offsetWidth > area.clientWidth - margin) left = point.x - gap - popup.offsetWidth;
+        left = Math.max(margin, Math.min(left, area.clientWidth - popup.offsetWidth - margin));
+        const top = Math.max(margin, Math.min(point.y - popup.offsetHeight / 2, area.clientHeight - popup.offsetHeight - margin));
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+    }
+
+    // An argument: its label, and the arguments attacking it and those it attacks
+    private popup() {
+        const node = this.shown === null ? null : this.cy?.getElementById(this.shown);
+        if (node == null || node.empty()) return nothing;
+        const label = node.data('label') as string;
+        const chip = (name: string) => {
+            const other = this.cy!.getElementById(name);
+            return html`<span class="chip ${other.nonempty() ? (other.data('label') as string) : 'na'}">${name}</span>`;
+        };
+        const chips = (names: string[]) => (names.length === 0 ? html`<span class="muted">none</span>` : names.map(chip));
+        const by = node.incomers('edge').map(it => (it as EdgeSingular).source().id());
+        const on = node.outgoers('edge').map(it => (it as EdgeSingular).target().id());
+        return html`
+            <div class="popup" role="tooltip">
+                <div class="header">
+                    ${chip(node.id())}
+                    <span class="label">${this.graph === null ? 'not solved yet' : label === 'na' ? 'not labelled' : label}</span>
+                    ${node.hasClass('derived') ? html`<span class="muted">derived</span>` : nothing}
+                </div>
+                <div class="row"><span class="title">Attacked by</span><span class="chips">${chips(by)}</span></div>
+                <div class="row"><span class="title">Attacks</span><span class="chips">${chips(on)}</span></div>
+            </div>
+        `;
+    }
+
     private placeRename(): void {
         const box = this.renderRoot.querySelector<HTMLElement>('.rename');
         const node = this.renaming === null ? null : this.cy?.getElementById(this.renaming.name);
@@ -376,6 +433,7 @@ export class Arg2pFramework extends LitElement {
             </div>
             <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
                 <div class="canvas"></div>
+                ${this.popup()}
                 ${this.derived
                     ? html`<div class="legend" part="legend">
                           <span><span class="line"></span>declared in the theory: drawing changes it</span>
@@ -460,6 +518,62 @@ export class Arg2pFramework extends LitElement {
             .canvas {
                 position: absolute;
                 inset: 0;
+            }
+            .popup {
+                position: absolute;
+                z-index: 20;
+                width: max-content;
+                max-width: min(280px, calc(100% - 16px));
+                padding: 8px 10px;
+                background: var(--_surface);
+                border: 1px solid var(--_border);
+                border-radius: 8px;
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+                pointer-events: none;
+            }
+            .popup .header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 4px;
+            }
+            .popup .label {
+                font-size: 11px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--_muted);
+            }
+            .popup .row {
+                display: grid;
+                grid-template-columns: 76px 1fr;
+                gap: 6px;
+                padding: 2px 0;
+            }
+            .popup .title,
+            .muted {
+                color: var(--_muted);
+            }
+            .popup .chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .chip {
+                color: #ffffff;
+                border-radius: 10px;
+                padding: 0 8px;
+                font-size: 12px;
+                background: var(--_unlabelled);
+            }
+            .chip.in {
+                background: var(--_in);
+            }
+            .chip.out {
+                background: var(--_out);
+            }
+            .chip.und {
+                background: var(--_und);
             }
             .legend {
                 position: absolute;
