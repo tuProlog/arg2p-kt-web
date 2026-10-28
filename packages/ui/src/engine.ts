@@ -100,3 +100,9 @@ export interface Engine {
     /** Stops the evaluation going on: what it was waited for fails, as stopped */
     stop(): void;
 }
+
+/** A solution, and the run it comes from: the stages of its computation are read back through it */
+export interface Solved {
+    readonly solution: SolutionData;
+    readonly run: Pick<Run, 'graphAt'> | null;
+}

@@ -165,7 +165,8 @@ export class Arg2pPlayground extends LitElement {
         this.output = '';
         this.graph = null;
         this.find<Arg2pSolutions>('arg2p-solutions')?.clear();
-        this.find<Arg2pGraph>('arg2p-graph')?.clear();
+        const graph = this.find<Arg2pGraph>('arg2p-graph');
+        if (graph !== null) graph.solution = null;
         const drawing = this.find<Arg2pFramework>('arg2p-framework');
         if (drawing !== null) drawing.graph = null;
     }
@@ -200,7 +201,8 @@ export class Arg2pPlayground extends LitElement {
 
     private showSolution(solution: SolutionData, run: Run | null): void {
         this.graph = solution.graph;
-        this.find<Arg2pGraph>('arg2p-graph')?.showSolution(solution, run);
+        const graph = this.find<Arg2pGraph>('arg2p-graph');
+        if (graph !== null) graph.solution = { solution, run };
         const drawing = this.find<Arg2pFramework>('arg2p-framework');
         if (drawing !== null) drawing.graph = solution.graph;
     }

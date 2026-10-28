@@ -1,45 +1,28 @@
-import type { Core, EdgeSingular, EventObject, NodeSingular, StylesheetJson } from 'cytoscape';
+import type { Core, EventObject, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
+import { isAtom } from '../formats/atoms.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
-import type { Framework } from '../formats/frameworks.js';
-import { NODE_FONT, drawing, fit, followSize, nodeSize, png } from '../graph/canvas.js';
-import { MUTUAL_STYLE, markMutual, placeByName, positionsOf, type Positions } from '../graph/positions.js';
-import { labelColor, tokens } from '../theme.js';
-
-const NAME = /^[a-z][a-zA-Z0-9_]*$/;
+import { frameworkOf, type Framework } from '../formats/frameworks.js';
+import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
+import { isAbstract, nameOf } from '../graph/drawing.js';
+import type { Positions } from '../graph/positions.js';
+import { tokens } from '../theme.js';
+import { popup, popupStyles, type AttackShown } from './popup.js';
+import { buttons, chips, define, emit } from './shared.js';
 
 type Mode = 'select' | 'argument' | 'attack';
 
+/** An argument or an attack drawn, and whether the theory derives it without declaring it */
+interface Shown<T> {
+    readonly it: T;
+    readonly derived: boolean;
+}
+
 const STYLE: StylesheetJson = [
-    {
-        selector: 'node',
-        style: {
-            shape: 'ellipse',
-            'background-color': 'data(color)',
-            label: 'data(id)',
-            color: '#ffffff',
-            'font-family': NODE_FONT.family,
-            'font-size': NODE_FONT.size,
-            'text-valign': 'center',
-            'text-halign': 'center',
-            width: 'data(width)',
-            height: 'data(height)',
-        },
-    },
-    { selector: 'node:selected, node.source', style: { 'border-width': 3, 'border-color': 'data(outline)' } },
-    {
-        selector: 'edge',
-        style: {
-            width: 2,
-            'line-color': 'data(color)',
-            'target-arrow-color': 'data(color)',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-        },
-    },
+    // the attacker picked, in attack mode
+    { selector: 'node.source', style: { 'border-width': 3, 'border-color': 'data(outline)' } },
     { selector: 'edge:selected', style: { width: 4 } },
-    MUTUAL_STYLE,
     // what the theory derives and does not declare: drawn, not edited by drawing
     { selector: 'node.derived', style: { 'border-width': 3, 'border-style': 'dashed', 'border-color': 'data(outline)', 'background-opacity': 0.8 } },
     {
@@ -55,10 +38,11 @@ const STYLE: StylesheetJson = [
  * The theory edited as text is drawn again, the arguments kept where they were.
  *
  * Given the graph of a solution, the arguments take the colours of their labels, and what the theory derives without
- * declaring it is drawn too, dashed: it changes with the clauses that derive it, not by drawing.
+ * declaring it is drawn too, dashed: it changes with the clauses that derive it, not by drawing. Hovering an argument
+ * (or tapping it) tells about it.
  *
- * Events: `arg2p-theory-change` with the theory, after every change made by drawing; `arg2p-export` with the picture
- * of the framework, as for the graph.
+ * Events: `arg2p-theory-change` with the theory, after every change made by drawing; `arg2p-positions` with where the
+ * arguments are, as they are laid out or dragged; `arg2p-export` with the picture of the framework, as for the graph.
  */
 export class Arg2pFramework extends LitElement {
     static override properties = {
@@ -70,16 +54,14 @@ export class Arg2pFramework extends LitElement {
         mode: { state: true },
         selected: { state: true },
         renaming: { state: true },
-        shown: { state: true },
         source: { state: true },
-        derived: { state: true },
     };
 
     /** The theory drawn */
     theory = '';
     /** The graph of a solution of [theory], to show its labels and what it derives; null when there is none */
     graph: GraphData | null = null;
-    /** Where the arguments are, by name: shared with the graph of the framework (see arg2p-positions) */
+    /** Where the arguments are, by name, as the graph of the framework has them (see arg2p-positions) */
     positions: Positions | null = null;
     readonly = false;
     /** The name of the picture the framework is saved as, with no extension */
@@ -88,79 +70,51 @@ export class Arg2pFramework extends LitElement {
     private mode: Mode = 'select';
     private selected = false;
     private renaming: { name: string; value: string } | null = null;
-    // the argument the popup is about: hovered, or tapped to keep it open
-    private shown: string | null = null;
-    private pinned: string | null = null;
     // the attacker picked, in attack mode
     private source: string | null = null;
-    // whether the graph adds to the framework what the theory derives
-    private derived = false;
 
-    private cy: Core | null = null;
-    private unfollow = () => {};
-    // the framework of [theory], as drawn
-    private drawn: Framework = { arguments: [], attacks: [] };
+    // The graph of the theory drawn (that of another theory has labels that no longer hold), and what is drawn: the
+    // framework the theory declares, and what the graph adds to it
+    private labelled: GraphData | null = null;
+    private declared: Framework = { arguments: [], attacks: [] };
+    private drawnArguments: readonly Shown<string>[] = [];
+    private drawnAttacks: readonly Shown<{ from: string; to: string }>[] = [];
+    private labels: ReadonlyMap<string, string> = new Map();
 
-    /** The arguments and attacks the theory declares */
-    framework(): Framework {
-        return this.drawn;
-    }
-
-    /** The drawing, for what the element does not do itself (and for tests) */
-    get drawing(): Core | null {
-        return this.cy;
-    }
+    private readonly canvas = new Canvas(this, {
+        style: STYLE,
+        redraw: () => this.draw(),
+        setup: cy => this.listen(cy),
+        // read only, a tap still tells about an argument
+        pins: () => this.readonly || this.mode === 'select',
+        locked: () => this.readonly,
+    });
 
     /** Fits the drawing to the element (after it was hidden, and so sized to nothing) */
     fit(): void {
-        if (this.cy === null) return;
-        this.cy.resize();
-        fit(this.cy);
+        this.canvas.fit();
     }
 
     /** The framework as a PNG picture, as a data URL */
     png(): string {
-        if (this.cy === null) return '';
-        return png(this.cy, getComputedStyle(this).getPropertyValue('--_surface').trim() || '#ffffff');
+        return this.canvas.png();
     }
 
-    protected override firstUpdated(): void {
-        const cy = drawing(this.renderRoot.querySelector<HTMLElement>('.canvas')!, STYLE);
-        cy.on('tap', (event: EventObject) => this.tap(event));
-        cy.on('dbltap', (event: EventObject) => {
-            if (this.readonly) return;
-            if (event.target === cy) this.add(event.position);
-            else if (event.target.isNode()) this.startRename(event.target.id());
-        });
-        cy.on('dragfree', 'node', () => this.tellPositions());
-        cy.on('select unselect', () => {
-            this.selected = cy.$(':selected').nonempty();
-        });
-        cy.on('viewport position', () => {
-            this.placeRename();
-            this.placePopup();
-        });
-        cy.on('mouseover', 'node', (event: EventObject) => (this.shown = event.target.id()));
-        cy.on('mouseout', 'node', () => (this.shown = this.pinned));
-        this.cy = cy;
-        this.unfollow = followSize(cy, this.renderRoot.querySelector<HTMLElement>('.canvas')!);
-        this.draw();
+    /** Draws the framework again, in the colours the page sets now (after a change of theme) */
+    restyle(): void {
+        this.canvas.restyle();
     }
 
     protected override willUpdate(changed: PropertyValues): void {
-        // the graph of another theory: its labels no longer hold
-        if (changed.has('theory') && !changed.has('graph') && changed.get('theory') !== undefined) this.graph = null;
+        if (changed.has('graph')) this.labelled = this.graph !== null && isAbstract(this.graph) ? this.graph : null;
+        else if (changed.has('theory')) this.labelled = null;
+        if (changed.has('theory') || changed.has('graph')) this.read();
+        if (changed.has('readonly') && this.readonly) this.setMode('select');
     }
 
     protected override updated(changed: PropertyValues): void {
+        if (changed.has('positions')) this.canvas.give(this.positions);
         if (changed.has('theory') || changed.has('graph')) this.draw();
-        if (changed.has('shown') || changed.has('graph')) this.placePopup();
-        // placed elsewhere (by the graph of the framework): moved there
-        else if (changed.has('positions') && this.cy !== null && placeByName(this.cy, idOf, this.positions)) this.tellPositions();
-        if (changed.has('readonly')) {
-            if (this.readonly) this.setMode('select');
-            this.cy?.autoungrabify(this.readonly);
-        }
         if (changed.has('renaming') && this.renaming !== null && changed.get('renaming') === null) {
             const box = this.renderRoot.querySelector<HTMLInputElement>('.rename');
             this.placeRename();
@@ -169,132 +123,100 @@ export class Arg2pFramework extends LitElement {
         }
     }
 
-    override disconnectedCallback(): void {
-        super.disconnectedCallback();
-        this.unfollow();
-        this.cy?.destroy();
-        this.cy = null;
-    }
-
-    override connectedCallback(): void {
-        super.connectedCallback();
-        if (this.hasUpdated && this.cy === null) this.firstUpdated();
-    }
-
-    // The declared framework, and what the graph adds to it, drawn: the arguments already drawn stay where they are,
-    // the new ones go around the middle of the view (all placed anew when there were none)
-    private draw(): void {
-        const cy = this.cy;
-        if (cy === null) return;
-        this.drawn = declaredFramework(this.theory);
-        const declared = new Set(this.drawn.arguments);
-        const named = this.graph?.profile === 'abstract' ? this.graph : null;
-        const labels = new Map((named?.arguments ?? []).map(it => [it.conclusion, it.label]));
-        const names = new Map((named?.arguments ?? []).map(it => [it.id, it.conclusion]));
-        const attacks = new Set(this.drawn.attacks.map(it => `${it.from}->${it.to}`));
-        const derivedAttacks = (named?.attacks ?? [])
-            .map(it => ({ from: names.get(it.from), to: names.get(it.to) }))
-            .filter((it): it is { from: string; to: string } => it.from !== undefined && it.to !== undefined && !attacks.has(`${it.from}->${it.to}`));
-        const outline = getComputedStyle(this).getPropertyValue('--_accent').trim() || '#008080';
-        const nodes = [...this.drawn.arguments, ...[...labels.keys()].filter(it => !declared.has(it))].map(name => ({
-            data: { id: name, label: labels.get(name) ?? 'na', color: labelColor(this, labels.get(name)), outline, ...nodeSize(name) },
-            classes: declared.has(name) ? '' : 'derived',
-        }));
-        const attackColor = (from: string) => (labels.has(from) ? labelColor(this, labels.get(from)) : labelColor(this, null));
-        const edges = [
-            ...this.drawn.attacks.map(it => ({ data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, color: attackColor(it.from) }, classes: '' })),
-            ...derivedAttacks.map(it => ({ data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, color: attackColor(it.from) }, classes: 'derived' })),
+    // The declared framework, and what the graph adds to it
+    private read(): void {
+        this.declared = declaredFramework(this.theory);
+        const solved = this.labelled === null ? { arguments: [], attacks: [] } : frameworkOf(this.labelled);
+        const declaredAttacks = new Set(this.declared.attacks.map(key));
+        this.drawnArguments = [
+            ...this.declared.arguments.map(it => ({ it, derived: false })),
+            ...solved.arguments.filter(it => !this.declared.arguments.includes(it)).map(it => ({ it, derived: true })),
         ];
-        this.derived = nodes.some(it => it.classes === 'derived') || derivedAttacks.length > 0;
-        const wanted = new Set([...nodes, ...edges].map(it => it.data.id));
-        const first = cy.nodes().empty();
-        // the arguments stay where they are, or go where the graph has them
-        const placed = { ...positionsOf(cy, idOf), ...this.positions };
+        this.drawnAttacks = [
+            ...this.declared.attacks.map(it => ({ it, derived: false })),
+            ...solved.attacks.filter(it => !declaredAttacks.has(key(it))).map(it => ({ it, derived: true })),
+        ];
+        this.labels = new Map((this.labelled?.arguments ?? []).map(it => [nameOf(it, true), it.label]));
+        if (this.source !== null && !this.drawnArguments.some(({ it }) => it === this.source)) this.source = null;
+    }
 
-        cy.batch(() => {
-            cy.elements().filter(it => !wanted.has(it.id())).remove();
-            nodes.forEach(({ data, classes }) => {
-                const node = cy.getElementById(data.id);
-                if (node.nonempty()) node.data(data).classes(classes);
-                else cy.add({ group: 'nodes', data, classes });
-            });
-            edges.forEach(({ data, classes }) => {
-                const edge = cy.getElementById(data.id);
-                if (edge.nonempty()) edge.data(data).classes(classes);
-                else cy.add({ group: 'edges', data, classes });
-            });
+    // Drawn as it was read: the arguments already drawn stay where they are, the new ones go where the graph has them,
+    // or around the others
+    private draw(): void {
+        const tone = (name: string) => this.labels.get(name) ?? 'na';
+        const nodes: Drawn[] = this.drawnArguments.map(({ it, derived }) => ({
+            group: 'nodes',
+            data: { id: it, name: it, text: it, tone: tone(it), ...nodeSize(it) },
+            classes: [derived ? 'derived' : '', it === this.source ? 'source' : ''].join(' ').trim(),
+        }));
+        const edges: Drawn[] = this.drawnAttacks.map(({ it, derived }) => ({
+            group: 'edges',
+            data: { id: key(it), source: it.from, target: it.to, tone: tone(it.from) },
+            classes: derived ? 'derived' : '',
+        }));
+        this.canvas.draw([...nodes, ...edges]);
+    }
+
+    private listen(cy: Core): void {
+        cy.on('tap', (event: EventObject) => this.tap(event));
+        cy.on('dbltap', (event: EventObject) => {
+            if (this.readonly) return;
+            if (event.target === cy) this.add(event.position);
+            else if (event.target.isNode()) this.startRename(event.target.id());
         });
-
-        markMutual(cy);
-        const laid = placeByName(cy, idOf, placed);
-        // what the graph does not know where to place yet (an argument added, laid out, renamed): told
-        const told = new Set(Object.keys(this.positions ?? {}));
-        if (laid || cy.nodes().some(it => !told.has((it as NodeSingular).id())) || told.size !== cy.nodes().length) this.tellPositions();
-        if (first && cy.nodes().nonempty()) fit(cy);
-        if (this.source !== null && cy.getElementById(this.source).empty()) this.source = null;
-        if (this.shown !== null && cy.getElementById(this.shown).empty()) this.shown = this.pinned = null;
+        cy.on('select unselect', () => {
+            this.selected = cy.$(':selected').nonempty();
+        });
+        // the rename box stays on its node while the drawing moves
+        cy.on('viewport position', () => this.placeRename());
     }
 
-    // Where the arguments are now, for the graph of the framework to place them alike
-    private tellPositions(): void {
-        if (this.cy === null) return;
-        this.positions = positionsOf(this.cy, idOf);
-        this.dispatchEvent(new CustomEvent('arg2p-positions', { detail: { positions: this.positions }, bubbles: true, composed: true }));
-    }
-
+    // Drawing with a tap: an argument where it is, or an attack from the attacker picked
     private tap(event: EventObject): void {
-        const cy = this.cy!;
+        const cy = event.cy;
         if (this.readonly) return;
-        const onNode = event.target !== cy && event.target.isNode();
-        if (this.mode === 'select') {
-            this.pinned = onNode ? (event.target.id() as string) : null;
-            this.shown = this.pinned;
-        }
         if (this.mode === 'argument' && event.target === cy) this.add(event.position);
         else if (this.mode === 'attack') {
-            if (!onNode) return this.pick(null);
+            if (event.target === cy || !event.target.isNode()) return this.pick(null);
             const id = event.target.id() as string;
             if (this.source === null) return this.pick(id);
             const from = this.source;
             this.pick(null);
-            const known = this.drawn.arguments.includes(from) && this.drawn.arguments.includes(id);
-            if (known && !this.drawn.attacks.some(it => it.from === from && it.to === id)) {
-                this.change({ arguments: this.drawn.arguments, attacks: [...this.drawn.attacks, { from, to: id }] });
+            const known = this.declared.arguments.includes(from) && this.declared.arguments.includes(id);
+            if (known && !this.declared.attacks.some(it => it.from === from && it.to === id)) {
+                this.change({ arguments: this.declared.arguments, attacks: [...this.declared.attacks, { from, to: id }] });
             }
         }
     }
 
-    // The attacker of the attack being drawn
     private pick(id: string | null): void {
-        this.cy?.$('.source').removeClass('source');
+        this.canvas.cy?.$('.source').removeClass('source');
         this.source = id;
-        if (id !== null) this.cy?.getElementById(id).addClass('source');
+        if (id !== null) this.canvas.cy?.getElementById(id).addClass('source');
     }
 
     private add(position: { x: number; y: number }): void {
         const name = this.suggestedName();
         // placed where it was asked for before the theory draws it
-        this.cy?.add({ group: 'nodes', data: { id: name, color: labelColor(this, null), ...nodeSize(name) }, position: { ...position } });
-        this.change({ arguments: [...this.drawn.arguments, name], attacks: this.drawn.attacks });
+        this.canvas.add({ group: 'nodes', data: { id: name, name, text: name, tone: 'na', ...nodeSize(name) }, classes: '' }, position);
+        this.change({ arguments: [...this.declared.arguments, name], attacks: this.declared.attacks });
     }
 
     // A change made by drawing: the theory rewritten, then drawn again from it
     private change(framework: Framework, renamed: ReadonlyMap<string, string> = new Map()): void {
         this.theory = redrawn(this.theory, framework, renamed);
-        // the labels were those of the theory before
-        this.graph = null;
-        this.dispatchEvent(new CustomEvent('arg2p-theory-change', { detail: { theory: this.theory }, bubbles: true, composed: true }));
+        emit(this, 'arg2p-theory-change', { theory: this.theory });
     }
 
     // Only what is declared is deleted by drawing
     private deleteSelected(): void {
-        const cy = this.cy;
+        const cy = this.canvas.cy;
         if (cy === null) return;
-        const gone = new Set(cy.$('node:selected').map(it => it.id()).filter(it => this.drawn.arguments.includes(it)));
+        const gone = new Set(cy.$('node:selected').map(it => it.id()).filter(it => this.declared.arguments.includes(it)));
         const goneAttacks = new Set(cy.$('edge:selected').map(it => it.id()));
         this.change({
-            arguments: this.drawn.arguments.filter(it => !gone.has(it)),
-            attacks: this.drawn.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(`${it.from}->${it.to}`)),
+            arguments: this.declared.arguments.filter(it => !gone.has(it)),
+            attacks: this.declared.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(key(it))),
         });
         this.selected = cy.$(':selected').nonempty();
     }
@@ -305,16 +227,16 @@ export class Arg2pFramework extends LitElement {
     }
 
     private suggestedName(): string {
-        const taken = new Set(this.cy?.nodes().map(it => it.id()) ?? []);
+        const taken = new Set(this.canvas.cy?.nodes().map(it => it.id()) ?? []);
         for (let i = 1; ; i++) if (!taken.has(`a${i}`)) return `a${i}`;
     }
 
     private isAvailable(name: string, current: string): boolean {
-        return NAME.test(name) && (name === current || (this.cy?.getElementById(name).empty() ?? true));
+        return isAtom(name) && (name === current || (this.canvas.cy?.getElementById(name).empty() ?? true));
     }
 
     private startRename(name: string): void {
-        if (this.drawn.arguments.includes(name)) this.renaming = { name, value: name };
+        if (this.declared.arguments.includes(name)) this.renaming = { name, value: name };
     }
 
     // An invalid or taken name is dropped: the argument keeps its name
@@ -324,65 +246,24 @@ export class Arg2pFramework extends LitElement {
         if (renaming === null) return;
         const wanted = renaming.value.trim();
         if (wanted === renaming.name || !this.isAvailable(wanted, renaming.name)) return;
-        const node = this.cy?.getElementById(renaming.name);
+        const node = this.canvas.cy?.getElementById(renaming.name);
         // the renamed argument stays where it was
-        if (node?.nonempty()) this.cy?.add({ group: 'nodes', data: { ...node.data(), id: wanted, ...nodeSize(wanted) }, position: { ...node.position() } });
+        if (node?.nonempty()) {
+            this.canvas.add({ group: 'nodes', data: { ...node.data(), id: wanted, name: wanted, text: wanted, ...nodeSize(wanted) }, classes: '' }, node.position());
+        }
         const rename = (it: string) => (it === renaming.name ? wanted : it);
         this.change(
             {
-                arguments: this.drawn.arguments.map(rename),
-                attacks: this.drawn.attacks.map(it => ({ from: rename(it.from), to: rename(it.to) })),
+                arguments: this.declared.arguments.map(rename),
+                attacks: this.declared.attacks.map(it => ({ from: rename(it.from), to: rename(it.to) })),
             },
             new Map([[renaming.name, wanted]]),
         );
     }
 
-    // The rename box stays on its node while the drawing moves
-    // Next to its node, flipped to the other side or held in when it would leave the area
-    private placePopup(): void {
-        const popup = this.renderRoot.querySelector<HTMLElement>('.popup');
-        const area = this.renderRoot.querySelector<HTMLElement>('.area');
-        const node = this.shown === null ? null : this.cy?.getElementById(this.shown);
-        if (popup === null || area === null || node == null || node.empty()) return;
-        const point = node.renderedPosition();
-        const margin = 8;
-        const gap = node.renderedWidth() / 2 + 8;
-        let left = point.x + gap;
-        if (left + popup.offsetWidth > area.clientWidth - margin) left = point.x - gap - popup.offsetWidth;
-        left = Math.max(margin, Math.min(left, area.clientWidth - popup.offsetWidth - margin));
-        const top = Math.max(margin, Math.min(point.y - popup.offsetHeight / 2, area.clientHeight - popup.offsetHeight - margin));
-        popup.style.left = `${left}px`;
-        popup.style.top = `${top}px`;
-    }
-
-    // An argument: its label, and the arguments attacking it and those it attacks
-    private popup() {
-        const node = this.shown === null ? null : this.cy?.getElementById(this.shown);
-        if (node == null || node.empty()) return nothing;
-        const label = node.data('label') as string;
-        const chip = (name: string) => {
-            const other = this.cy!.getElementById(name);
-            return html`<span class="chip ${other.nonempty() ? (other.data('label') as string) : 'na'}">${name}</span>`;
-        };
-        const chips = (names: string[]) => (names.length === 0 ? html`<span class="muted">none</span>` : names.map(chip));
-        const by = node.incomers('edge').map(it => (it as EdgeSingular).source().id());
-        const on = node.outgoers('edge').map(it => (it as EdgeSingular).target().id());
-        return html`
-            <div class="popup" role="tooltip">
-                <div class="header">
-                    ${chip(node.id())}
-                    <span class="label">${this.graph === null ? 'not solved yet' : label === 'na' ? 'not labelled' : label}</span>
-                    ${node.hasClass('derived') ? html`<span class="muted">derived</span>` : nothing}
-                </div>
-                <div class="row"><span class="title">Attacked by</span><span class="chips">${chips(by)}</span></div>
-                <div class="row"><span class="title">Attacks</span><span class="chips">${chips(on)}</span></div>
-            </div>
-        `;
-    }
-
     private placeRename(): void {
         const box = this.renderRoot.querySelector<HTMLElement>('.rename');
-        const node = this.renaming === null ? null : this.cy?.getElementById(this.renaming.name);
+        const node = this.renaming === null ? null : this.canvas.cy?.getElementById(this.renaming.name);
         if (box === null || node == null || node.empty()) return;
         const point = node.renderedPosition();
         box.style.left = `${point.x}px`;
@@ -396,17 +277,6 @@ export class Arg2pFramework extends LitElement {
             event.preventDefault();
             this.deleteSelected();
         }
-    }
-
-    private export(): void {
-        const fileName = `${this.fileName}.png`;
-        const dataUrl = this.png();
-        const event = new CustomEvent('arg2p-export', { detail: { fileName, dataUrl }, bubbles: true, composed: true, cancelable: true });
-        if (!this.dispatchEvent(event)) return;
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = fileName;
-        link.click();
     }
 
     protected override render() {
@@ -429,12 +299,12 @@ export class Arg2pFramework extends LitElement {
                           <button type="button" title="Delete what is selected (Del)" ?disabled=${!this.selected} @click=${() => this.deleteSelected()}>Delete</button>
                           <span class="hint">${hint}</span>
                       `}
-                <button type="button" class="png" title="Download the framework as a picture" @click=${() => this.export()}>PNG</button>
+                <button type="button" class="png" title="Download the framework as a picture" @click=${() => this.canvas.export(this.fileName)}>PNG</button>
             </div>
             <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
                 <div class="canvas"></div>
-                ${this.popup()}
-                ${this.derived
+                ${this.renderPopup()}
+                ${this.drawnArguments.some(it => it.derived) || this.drawnAttacks.some(it => it.derived)
                     ? html`<div class="legend" part="legend">
                           <span><span class="line"></span>declared in the theory: drawing changes it</span>
                           <span><span class="line derived"></span>derived by its rules: change the rules to change it</span>
@@ -460,8 +330,31 @@ export class Arg2pFramework extends LitElement {
         `;
     }
 
+    // An argument: its label, and the arguments attacking it and those it attacks
+    private renderPopup() {
+        const shown = this.drawnArguments.find(({ it }) => it === this.canvas.shown);
+        if (shown === undefined) return nothing;
+        const name = shown.it;
+        const named = (it: string) => ({ name: it, label: this.labels.get(it) ?? 'na' });
+        const attack = (other: string): AttackShown => ({ other: named(other), type: null, on: null });
+        const label = named(name).label;
+        return popup({
+            ...named(name),
+            status: this.labelled === null ? 'not solved yet' : label === 'na' ? 'not labelled yet' : label,
+            kind: shown.derived ? 'derived' : null,
+            conclusion: null,
+            topRule: null,
+            builtOn: null,
+            attackedBy: this.drawnAttacks.filter(({ it }) => it.to === name).map(({ it }) => attack(it.from)),
+            attacks: this.drawnAttacks.filter(({ it }) => it.from === name).map(({ it }) => attack(it.to)),
+        });
+    }
+
     static override styles = [
         tokens,
+        buttons,
+        chips,
+        popupStyles,
         css`
             :host {
                 display: flex;
@@ -478,25 +371,9 @@ export class Arg2pFramework extends LitElement {
                 padding: 6px 10px;
                 border-bottom: 1px solid var(--_border);
             }
-            button {
-                font: inherit;
-                color: var(--_text);
-                background: var(--_surface);
-                border: 1px solid var(--_border);
-                border-radius: 4px;
-                padding: 2px 8px;
-                cursor: pointer;
-            }
-            button:hover:not(:disabled) {
-                background: var(--_hover);
-            }
             button.active {
                 border-color: var(--_accent);
                 color: var(--_accent);
-            }
-            button:disabled {
-                opacity: 0.5;
-                cursor: default;
             }
             .hint {
                 margin-left: auto;
@@ -518,62 +395,6 @@ export class Arg2pFramework extends LitElement {
             .canvas {
                 position: absolute;
                 inset: 0;
-            }
-            .popup {
-                position: absolute;
-                z-index: 20;
-                width: max-content;
-                max-width: min(280px, calc(100% - 16px));
-                padding: 8px 10px;
-                background: var(--_surface);
-                border: 1px solid var(--_border);
-                border-radius: 8px;
-                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-                pointer-events: none;
-            }
-            .popup .header {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 4px;
-            }
-            .popup .label {
-                font-size: 11px;
-                font-weight: bold;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                color: var(--_muted);
-            }
-            .popup .row {
-                display: grid;
-                grid-template-columns: 76px 1fr;
-                gap: 6px;
-                padding: 2px 0;
-            }
-            .popup .title,
-            .muted {
-                color: var(--_muted);
-            }
-            .popup .chips {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 4px;
-            }
-            .chip {
-                color: #ffffff;
-                border-radius: 10px;
-                padding: 0 8px;
-                font-size: 12px;
-                background: var(--_unlabelled);
-            }
-            .chip.in {
-                background: var(--_in);
-            }
-            .chip.out {
-                background: var(--_out);
-            }
-            .chip.und {
-                background: var(--_und);
             }
             .legend {
                 position: absolute;
@@ -623,12 +444,11 @@ export class Arg2pFramework extends LitElement {
     ];
 }
 
-// An argument drawn is called by its name
-function idOf(node: NodeSingular): string {
-    return node.id();
+function key(attack: { from: string; to: string }): string {
+    return `${attack.from}->${attack.to}`;
 }
 
-customElements.define('arg2p-framework', Arg2pFramework);
+define('arg2p-framework', Arg2pFramework);
 
 declare global {
     interface HTMLElementTagNameMap {

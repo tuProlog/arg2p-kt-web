@@ -48,7 +48,7 @@ framework.addEventListener('arg2p-theory-change', event => {
 });
 solutions.addEventListener('arg2p-solution', event => {
     const { solution, run } = (event as CustomEvent<{ solution: SolutionData; run: Run }>).detail;
-    graph.showSolution(solution, run);
+    graph.solution = { solution, run };
     framework.graph = solution.graph;
 });
 solutions.addEventListener('arg2p-error-select', event => {
@@ -58,7 +58,7 @@ solutions.addEventListener('arg2p-error-select', event => {
 });
 
 const solve = () => {
-    graph.clear();
+    graph.solution = null;
     engine.solve({ theory: theory.value, query: query.value, flags: flags.flags }, text => console.log(text)).then(
         run => solutions.start(run),
         (error: EngineError) => solutions.fail(error),

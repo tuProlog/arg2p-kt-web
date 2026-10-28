@@ -1,4 +1,4 @@
-import type { Core, NodeSingular } from 'cytoscape';
+import type { Core, NodeCollection, NodeSingular } from 'cytoscape';
 
 // The places of the arguments of an abstract framework, by their names: the drawing of a framework and its graph are
 // two ways of working on the same graph, so each places the arguments where the other has them.
@@ -6,11 +6,16 @@ import type { Core, NodeSingular } from 'cytoscape';
 /** Where each argument is, by its name */
 export type Positions = Readonly<Record<string, { readonly x: number; readonly y: number }>>;
 
+// The name of an argument drawn: the data `name` of its node
+function nameOf(node: NodeSingular): string {
+    return node.data('name') as string;
+}
+
 /**
- * The nodes of [cy] placed where [positions] has them (by [nameOf]), the others laid out around them by forces (all of
+ * The nodes of [cy] placed where [positions] has them (by name), the others laid out around them by forces (all of
  * them anew when none is known). Whether any had to be laid out.
  */
-export function placeByName(cy: Core, nameOf: (node: NodeSingular) => string, positions: Positions | null): boolean {
+export function placeByName(cy: Core, positions: Positions | null): boolean {
     const nodes = cy.nodes();
     const known = nodes.filter(it => positions?.[nameOf(it)] !== undefined);
     const unknown = nodes.not(known);
@@ -32,9 +37,15 @@ export function placeByName(cy: Core, nameOf: (node: NodeSingular) => string, po
     return true;
 }
 
-/** Where the nodes of [cy] are, by [nameOf] */
-export function positionsOf(cy: Core, nameOf: (node: NodeSingular) => string): Positions {
-    return Object.fromEntries(cy.nodes().map(it => [nameOf(it), { ...it.position() }]));
+/** Where [nodes] are, by name */
+export function positionsOf(nodes: NodeCollection): Positions {
+    return Object.fromEntries(nodes.map(it => [nameOf(it), { ...it.position() }]));
+}
+
+/** Whether [positions] has every node of [cy], and no other */
+export function placesAll(cy: Core, positions: Positions | null): boolean {
+    const nodes = cy.nodes();
+    return positions !== null && Object.keys(positions).length === nodes.length && nodes.map(nameOf).every(name => positions[name] !== undefined);
 }
 
 /** The edges of [cy] whose reverse is there too, as mutual attacks: they bend apart, so that both show */
