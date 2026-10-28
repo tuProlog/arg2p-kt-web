@@ -1,7 +1,8 @@
-import { Arg2p, Flags, Value, type Graph, type Solutions } from '@tuprolog/arg2p';
+import { Arg2p, Flags, Value, type Solutions } from '@tuprolog/arg2p';
 import { EMPTY_GRAPH, type EngineError, type GraphData, type SolutionData, type SyntaxProblem } from '../engine.js';
 import { FLAGS, type Settings } from '../flags/schema.js';
 import { unquote } from '../formats/atoms.js';
+import { graphData } from './graph.js';
 
 // The solver's side of the engine of the browser (see JsEngine): it answers messages, posting its answers with `post`.
 // Kept apart from the worker, so that it runs (and is tested) anywhere.
@@ -153,27 +154,6 @@ function profileOf(solver: Arg2p): string {
     } catch {
         return '';
     }
-}
-
-/** A graph of the API as plain data, read in [profile] */
-export function graphData(graph: Graph, profile = ''): GraphData {
-    return {
-        profile,
-        arguments: graph.labellings.map(({ argument, label }) => ({
-            id: argument.identifier,
-            descriptor: argument.descriptor,
-            conclusion: argument.conclusion,
-            topRule: argument.topRule,
-            label,
-            supports: argument.supports.map(it => it.identifier),
-        })),
-        attacks: graph.attacks.map(it => ({
-            from: it.attacker.identifier,
-            to: it.target.identifier,
-            type: it.type ?? null,
-            on: it.on?.identifier ?? null,
-        })),
-    };
 }
 
 /** Where [text], a theory (or flags) or a query, does not parse; null if it does */
