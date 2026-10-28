@@ -23,7 +23,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          sed -i "s/VERSION/$(grep '"@tuprolog/arg2p"' package.json | sed -E 's/.*: *"([^"]+)".*/\1/')/g" assets/index.html
       - name: Run tests
         run: |
           npm test
@@ -34,11 +33,45 @@ jobs:
         if: github.ref_name == 'master'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: prodDist
+          folder: packages/playground/dist
+  # @tuprolog/arg2p-ui on npm, from master, when its version is not published yet, with its provenance: npmjs.com
+  # trusts this workflow as its publisher (trusted publishing, which needs npm 11.5.1 or later), or else the token of
+  # the secret NPM_TOKEN serves (the first version, before the package exists to trust anything)
+  publish-ui:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+    if: github.ref_name == 'master'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Set up npm for trusted publishing
+        run: npm install --global npm@11.21.0
+      - name: Publish the components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p "require('./packages/ui/package.json').version")
+          if npm view "@tuprolog/arg2p-ui@$version" version > /dev/null 2>&1; then
+            echo "@tuprolog/arg2p-ui $version is on npm already"
+            exit 0
+          fi
+          npm install
+          npm run build -w @tuprolog/arg2p-ui
+          npm publish -w @tuprolog/arg2p-ui --access public --provenance
   success:
     runs-on: ubuntu-26.04
     needs:
       - test
+      - publish-ui
     if: >-
       always() && (
         contains(join(needs.*.result, ','), 'failure')

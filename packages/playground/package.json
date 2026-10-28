@@ -1,0 +1,31 @@
+{
+  "name": "@tuprolog/arg2p-playground",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The web playground of Arg2P, built with @tuprolog/arg2p-ui",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Giuseppe Pisano",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "gh-pages -d dist"
+  },
+  "dependencies": {
+    "@tuprolog/arg2p": "0.19.1",
+    "@tuprolog/arg2p-ui": "*",
+    "fflate": "0.8.3",
+    "lit": "3.3.3"
+  },
+  "devDependencies": {
+    "gh-pages": "6.3.0",
+    "happy-dom": "21.0.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.0.4"
+  }
+}
