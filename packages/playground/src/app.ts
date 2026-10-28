@@ -20,13 +20,16 @@ import { JsEngine } from '@tuprolog/arg2p-ui/js';
 import { LitElement, html, nothing, type PropertyValues } from 'lit';
 import { blank, DEFAULT_QUERY, type Content, type Workspace } from './documents.js';
 import { EXAMPLES } from './examples.js';
+import type { Arg2pFederation } from './federation/panel.js';
+import './federation/panel.js';
+import { readPairing } from './federation/links.js';
 import { downloadText, fileName, pickFile } from './files.js';
 import { read, shareUrl } from './links.js';
 import { Session, browserStorage } from './session.js';
 import { styles } from './styles.js';
 import { currentTheme, followSystem, toggleTheme } from './theme.js';
 
-type Panel = 'results' | 'flags' | 'console';
+type Panel = 'results' | 'flags' | 'console' | 'federation';
 
 const DOCS = 'https://tuprolog.github.io/arg2p-kt/';
 const PROJECT = 'https://github.com/tuProlog/arg2p-kt';
@@ -95,6 +98,13 @@ export class Arg2pPlayground extends LitElement {
         });
         this.session.attach(window);
         this.session.restore(() => ({ ...blank(), ...example('tweety') }), 'Tweety');
+        // A link of a pairing (#join=, #reply=): the federation takes it, and it leaves the address bar
+        const pairing = readPairing(window.location.hash);
+        if (pairing !== null) {
+            this.panel = 'federation';
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            this.updateComplete.then(() => this.find<Arg2pFederation>('arg2p-federation')?.opened(pairing));
+        }
         // A shared link opens in a tab of its own, so that it never overwrites anything, and runs; it leaves the
         // address bar, so that a reload does not open it again
         const link = read(window.location.search);
@@ -502,6 +512,7 @@ export class Arg2pPlayground extends LitElement {
         return html`
             <div class="panel-tabs" role="tablist">
                 ${tab('results', 'Solutions')} ${tab('flags', 'Flags')} ${tab('console', this.output === '' ? 'Console' : 'Console •')}
+                ${tab('federation', 'Federation')}
             </div>
             <div class="panel results" style="--solutions: ${this.layout.solutions}%" ?hidden=${this.panel !== 'results'}>
                 <arg2p-solutions
@@ -550,6 +561,9 @@ export class Arg2pPlayground extends LitElement {
             </div>
             <div class="panel console" ?hidden=${this.panel !== 'console'}>
                 ${this.output === '' ? html`<p class="hint">What the theory and the query print (write/1, say) shows here.</p>` : html`<pre>${this.output}</pre>`}
+            </div>
+            <div class="panel federation" ?hidden=${this.panel !== 'federation'}>
+                <arg2p-federation .theory=${this.content.theory} .flags=${this.content.flags}></arg2p-federation>
             </div>
         `;
     }
