@@ -1,10 +1,12 @@
-<p align="center"><img src="packages/playground/assets/pwa/icon.svg" width="200" alt="A2P logo"></p>
+<p align="center"><img src="packages/playground/public/icons/icon.svg" width="200" alt="Arg2P logo"></p>
 
 # [Arg2P-Kt](https://github.com/tuProlog/arg2p-kt) Web Playground
 
 Try it at <https://tuprolog.github.io/arg2p-kt-web/>. The playground can be
 installed as an app (*Install app* in Chrome and Edge, *Add to Home Screen* on
-iOS) and then works offline.
+iOS) and then works offline, on desktops, tablets and phones.
+
+![The playground](docs/playground.png)
 
 ## Packages
 
@@ -55,10 +57,16 @@ in the *Flags* tab, which shows the flags the profile presets and where each val
 
 An abstract framework is a theory of the profile `abstract`: `a.` an argument, `a -> b.` an
 attack, `a <-> b.` a mutual one, and Prolog clauses may derive them
-(`X -> Y :- beats(X, Y).`). Its arguments and attacks can also be **drawn**: the *Drawing* view
-writes what is drawn into the theory, draws the theory as it is edited, colours the arguments
-with the labelling of the solution shown, and draws dashed what the theory derives. Frameworks
-in the formats of ICCMA (APX, TGF, ICCMA'23) are imported as theories, and exported.
+(`X -> Y :- beats(X, Y).`). It is shown as its **drawing**, which writes what is drawn into the
+theory and draws the theory as it is edited: the arguments are coloured with the labelling of the
+solution shown, what the theory derives is drawn dashed, and an argument hovered or tapped tells
+its label, what attacks it and what it attacks. Frameworks are imported from APX, TGF and
+ICCMA'23 files as theories, and exported to APX and TGF.
+
+<p>
+  <img src="docs/drawing.png" width="640" alt="An abstract framework, drawn">
+  <img src="docs/phone.png" width="200" alt="The drawing on a phone">
+</p>
 
 ## Sharing a setup
 
