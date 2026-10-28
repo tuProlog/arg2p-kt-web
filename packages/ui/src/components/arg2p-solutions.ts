@@ -1,6 +1,8 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
-import type { EngineError, Run, SolutionData } from '../engine.js';
+import type { EngineError, Run, SolutionData, Solved } from '../engine.js';
+import { listItems } from '../formats/terms.js';
 import { tokens } from '../theme.js';
+import { activate, buttons, chip, chips, define, emit } from './shared.js';
 
 // Bindings named after a label (In, Out, Und) hold sets of arguments or statements: shown as chips coloured like the
 // graph
@@ -16,18 +18,18 @@ interface Entry {
  * The solutions of a query, asked for one at a time (Next): yes with its bindings, no, or halt with its error; an
  * error that kept the query from running shows alone. Picking a yes solution shows it again (its graph, say).
  *
- * Events: `arg2p-solution` with the solution and its run, when one is shown (the newest, or one picked);
+ * Events: `arg2p-solution` with the solution and its run (Solved), when one is shown (the newest, or one picked);
  * `arg2p-busy` with whether a solution is being computed; `arg2p-failure` with the EngineError of a computation that
  * failed (stopped, say); `arg2p-error-select` with the error shown, when it is picked (to go where it is).
  *
  * Attributes: `hide-exhausted-no` hides the no that only tells that the yes solutions are over; `trivial` is set
- * when there is nothing to show besides the query itself (a page may hide the solutions then).
+ * when there is nothing to show besides the query itself (a page may hide the solutions then), `busy` while a
+ * solution is being computed.
  */
 export class Arg2pSolutions extends LitElement {
     static override properties = {
         hideExhaustedNo: { type: Boolean, attribute: 'hide-exhausted-no' },
-        trivial: { type: Boolean, reflect: true },
-        busy: { type: Boolean, reflect: true },
+        working: { state: true },
         run: { state: true },
         entries: { state: true },
         error: { state: true },
@@ -35,9 +37,9 @@ export class Arg2pSolutions extends LitElement {
     };
 
     hideExhaustedNo = false;
-    trivial = true;
-    busy = false;
 
+    // whether a solution is being computed
+    private working = false;
     private run: Run | null = null;
     private entries: Entry[] = [];
     private error: EngineError | null = null;
@@ -60,6 +62,23 @@ export class Arg2pSolutions extends LitElement {
         this.reset();
     }
 
+    /** Whether a solution is being computed */
+    get busy(): boolean {
+        return this.working;
+    }
+
+    /**
+     * Whether there is nothing to show besides the query: a plain yes with no bindings only repeats it. The solutions
+     * are worth showing for bindings, failures and errors, and as soon as there is a second solution to pick from.
+     */
+    get trivial(): boolean {
+        return (
+            this.error === null &&
+            this.entries.every(it => it.solution.result === 'yes' && it.solution.bindings.length === 0) &&
+            this.entries.filter(it => it.solution.result === 'yes').length <= 1
+        );
+    }
+
     /** Whether there is another solution to ask for */
     get hasNext(): boolean {
         return this.run !== null && !this.busy && this.run.hasNext();
@@ -79,7 +98,7 @@ export class Arg2pSolutions extends LitElement {
             (error: EngineError) => {
                 if (run !== this.run) return;
                 this.setBusy(false);
-                this.emit('arg2p-failure', { error });
+                emit(this, 'arg2p-failure', { error });
             },
         );
     }
@@ -93,9 +112,9 @@ export class Arg2pSolutions extends LitElement {
     }
 
     private setBusy(busy: boolean): void {
-        if (this.busy === busy) return;
-        this.busy = busy;
-        this.emit('arg2p-busy', { busy });
+        if (this.working === busy) return;
+        this.working = busy;
+        emit(this, 'arg2p-busy', { busy });
     }
 
     private add(solution: SolutionData): void {
@@ -111,21 +130,13 @@ export class Arg2pSolutions extends LitElement {
 
     private show(entry: Entry): void {
         this.shown = entry;
-        this.emit('arg2p-solution', { solution: entry.solution, run: this.run });
-    }
-
-    private emit(type: string, detail: unknown): void {
-        this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+        const solved: Solved = { solution: entry.solution, run: this.run };
+        emit(this, 'arg2p-solution', solved);
     }
 
     protected override willUpdate(): void {
-        // A plain yes with no bindings only repeats the query: the solutions are worth showing for bindings, failures
-        // and errors, and as soon as there is a second solution to pick from
-        const yes = this.entries.filter(it => it.solution.result === 'yes');
-        this.trivial =
-            this.error === null &&
-            this.entries.every(it => it.solution.result === 'yes' && it.solution.bindings.length === 0) &&
-            yes.length <= 1;
+        this.toggleAttribute('trivial', this.trivial);
+        this.toggleAttribute('busy', this.busy);
     }
 
     protected override updated(changed: PropertyValues): void {
@@ -149,7 +160,7 @@ export class Arg2pSolutions extends LitElement {
 
     private renderError(error: EngineError) {
         const where = error.syntax;
-        const select = () => this.emit('arg2p-error-select', { error });
+        const select = () => emit(this, 'arg2p-error-select', { error });
         return html`
             <ol class="list">
                 <li
@@ -194,6 +205,8 @@ export class Arg2pSolutions extends LitElement {
 
     static override styles = [
         tokens,
+        buttons,
+        chips,
         css`
             :host {
                 display: block;
@@ -213,21 +226,8 @@ export class Arg2pSolutions extends LitElement {
                 word-break: break-word;
             }
             button {
-                font: inherit;
                 font-size: 13px;
-                color: var(--_text);
-                background: var(--_surface);
-                border: 1px solid var(--_border);
-                border-radius: 4px;
                 padding: 2px 10px;
-                cursor: pointer;
-            }
-            button:hover:not(:disabled) {
-                background: var(--_hover);
-            }
-            button:disabled {
-                opacity: 0.5;
-                cursor: default;
             }
             .list {
                 list-style: none;
@@ -314,20 +314,6 @@ export class Arg2pSolutions extends LitElement {
                 flex-wrap: wrap;
                 gap: 4px;
             }
-            .chip {
-                border-radius: 10px;
-                padding: 0 8px;
-                color: #ffffff;
-            }
-            .chip.in {
-                background: var(--_in);
-            }
-            .chip.out {
-                background: var(--_out);
-            }
-            .chip.und {
-                background: var(--_und);
-            }
             .empty,
             .pending {
                 color: var(--_muted);
@@ -344,12 +330,6 @@ function header(badge: string, title: string) {
     return html`<div class="header"><span class="badge">${badge}</span><span>${title}</span></div>`;
 }
 
-function activate(event: KeyboardEvent, action: () => void): void {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    action();
-}
-
 // `Variable = value` rows. A value of a label variable that is a list shows its items as chips; any other value keeps
 // its Prolog form, where a list and its single element would otherwise look the same.
 function bindings(list: SolutionData['bindings']) {
@@ -363,7 +343,7 @@ function bindings(list: SolutionData['bindings']) {
                     <dd>
                         ${items === null ? value
                         : items.length === 0 ? html`<span class="empty">[ ]</span>`
-                        : items.map(item => html`<span class="chip ${label}">${single(item)}</span>`)}
+                        : items.map(item => chip(single(item), label))}
                     </dd>
                 `;
             })}
@@ -377,33 +357,7 @@ function single(item: string): string {
     return items !== null && items.length === 1 ? items[0] : item;
 }
 
-/** The top level elements of a Prolog list term, or null for any other term (a list with a tail, `[a | T]`, too) */
-export function listItems(term: string): string[] | null {
-    const text = term.trim();
-    if (!text.startsWith('[') || !text.endsWith(']')) return null;
-    const body = text.slice(1, -1).trim();
-    if (body === '') return [];
-    const items: string[] = [];
-    let depth = 0;
-    let quoted = false;
-    let current = '';
-    for (const char of body) {
-        if (char === "'") quoted = !quoted;
-        if (!quoted && '([{'.includes(char)) depth++;
-        if (!quoted && ')]}'.includes(char)) depth--;
-        if (!quoted && depth === 0 && char === '|') return null;
-        if (!quoted && depth === 0 && char === ',') {
-            items.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    items.push(current.trim());
-    return items;
-}
-
-customElements.define('arg2p-solutions', Arg2pSolutions);
+define('arg2p-solutions', Arg2pSolutions);
 
 declare global {
     interface HTMLElementTagNameMap {

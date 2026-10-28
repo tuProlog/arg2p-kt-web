@@ -101,17 +101,29 @@ describe('<arg2p-flags>', function () {
         return { element, answering, changes, root: element.shadowRoot! };
     }
 
+    // A flag as the panel shows it: the values of its control, and where they come from (its badge)
+    function shownFlag(root: ShadowRoot, name: string): { values: string[]; source: string } {
+        const flag = root.querySelector(`[data-flag=${name}]`)!;
+        const source = flag.querySelector('.badge')!.textContent!;
+        const select = flag.querySelector('select');
+        if (select !== null) return { values: select.value === '' ? [] : [select.value], source };
+        const boxes = [...flag.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
+        if (flag.classList.contains('switch')) return { values: boxes[0].checked ? ['true'] : [], source };
+        if (boxes.length > 0) return { values: boxes.filter(it => it.checked).map(it => it.value), source };
+        return { values: [flag.querySelector('input')!.value].filter(it => it !== ''), source };
+    }
+
     afterEach(() => {
         document.body.replaceChildren();
     });
 
     it('should show the values in effect, and where they come from', async function () {
-        const { element, root } = await panel(`graphBuildMode(aba).\n${DEFAULT_FLAGS}`, 'r1 : a -> b.', () => ABA);
+        const { root } = await panel(`graphBuildMode(aba).\n${DEFAULT_FLAGS}`, 'r1 : a -> b.', () => ABA);
         equal(root.querySelector<HTMLSelectElement>('.profile select')!.value, 'aba');
-        deepEqual(element.effective({ name: 'graphExtension' }), { values: [], source: 'profile' });
-        deepEqual(element.effective({ name: 'argumentLabellingMode' }), { values: ['grounded'], source: 'flags' });
-        deepEqual(element.effective({ name: 'conflictModel' }), { values: ['declared'], source: 'profile' });
-        deepEqual(element.effective({ name: 'metaRules' }), { values: [], source: 'default' });
+        deepEqual(shownFlag(root, 'graphExtension'), { values: [], source: 'profile' });
+        deepEqual(shownFlag(root, 'argumentLabellingMode'), { values: ['grounded'], source: 'flags' });
+        deepEqual(shownFlag(root, 'conflictModel'), { values: ['declared'], source: 'profile' });
+        deepEqual(shownFlag(root, 'metaRules'), { values: [], source: 'default' });
         // ABA has no preferences: they are folded away
         const shown = [...root.children].filter(it => it.tagName === 'FIELDSET').map(it => it.querySelector('legend')!.textContent);
         deepEqual(shown, ['Semantics', 'Evaluation', 'Framework']);
@@ -119,13 +131,13 @@ describe('<arg2p-flags>', function () {
     });
 
     it('should leave to the theory what the theory states', async function () {
-        const { element, root } = await panel(DEFAULT_FLAGS, 'graphBuildMode(abstract).\nargumentLabellingMode(preferred).\na -> b.', () => ({
+        const { root } = await panel(DEFAULT_FLAGS, 'graphBuildMode(abstract).\nargumentLabellingMode(preferred).\na -> b.', () => ({
             ...DEFAULTS,
             graphBuildMode: ['abstract'],
             argumentLabellingMode: ['preferred'],
         }));
         ok(root.querySelector<HTMLSelectElement>('.profile select')!.disabled);
-        deepEqual(element.effective({ name: 'argumentLabellingMode' }), { values: ['preferred'], source: 'theory' });
+        deepEqual(shownFlag(root, 'argumentLabellingMode'), { values: ['preferred'], source: 'theory' });
         ok(root.querySelector<HTMLSelectElement>('#flag-argumentLabellingMode')!.disabled);
     });
 
@@ -164,7 +176,7 @@ describe('<arg2p-flags>', function () {
     });
 
     it('should warn about what the solver cannot run with', async function () {
-        const { element } = await panel(DEFAULT_FLAGS, '', () => ({ ...DEFAULTS, orderingPrinciple: ['weakest'], orderingComparator: ['normal'], argumentLabellingMode: [] }));
-        equal(element.warnings().length, 2);
+        const { root } = await panel(DEFAULT_FLAGS, '', () => ({ ...DEFAULTS, orderingPrinciple: ['weakest'], orderingComparator: ['normal'], argumentLabellingMode: [] }));
+        equal(root.querySelectorAll('.warnings li').length, 2);
     });
 });

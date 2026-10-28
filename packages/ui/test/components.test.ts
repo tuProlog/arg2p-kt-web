@@ -5,7 +5,8 @@ import { drawingOf } from '../src/graph/canvas.js';
 import '../src/index.js';
 import type { Arg2pFramework } from '../src/components/arg2p-framework.js';
 import type { Arg2pGraph } from '../src/components/arg2p-graph.js';
-import { listItems, type Arg2pSolutions } from '../src/components/arg2p-solutions.js';
+import type { Arg2pSolutions } from '../src/components/arg2p-solutions.js';
+import { listItems } from '../src/formats/terms.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
