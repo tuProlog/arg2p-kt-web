@@ -8,6 +8,6 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm run build -w @tuprolog/arg2p-ui && npm test --workspaces --if-present"
   }
 }
