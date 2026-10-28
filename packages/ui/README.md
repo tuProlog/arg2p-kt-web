@@ -45,5 +45,32 @@ npm install @tuprolog/arg2p-ui @tuprolog/arg2p
 `@tuprolog/arg2p-ui/data` has what they are built on with no DOM: the contract of engines, the flags and profiles, the
 formats of abstract frameworks (APX, TGF, ICCMA'23), the layout of graphs.
 
-The components take their colours from custom properties (`--arg2p-surface`, `--arg2p-text`, `--arg2p-accent`, ...),
-with a light theme otherwise.
+## Theming
+
+The components take their colours and fonts from custom properties a page sets (they cross into the components), with
+a light theme otherwise:
+
+| Property | |
+| --- | --- |
+| `--arg2p-surface`, `--arg2p-surface-2` | The background of the components, and of their bars |
+| `--arg2p-hover`, `--arg2p-border` | What is hovered, and the borders |
+| `--arg2p-text`, `--arg2p-muted` | The text, and what is said aside |
+| `--arg2p-accent`, `--arg2p-error`, `--arg2p-no` | What stands out: the active, the errors, the solutions that are no |
+| `--arg2p-in`, `--arg2p-out`, `--arg2p-und`, `--arg2p-unlabelled` | The labels of the arguments (the same in every theme: they carry meaning) |
+| `--arg2p-support` | The supports between arguments |
+| `--arg2p-atom`, `--arg2p-functor`, `--arg2p-variable`, `--arg2p-comment` | The highlighting of the editors |
+| `--arg2p-font`, `--arg2p-mono` | The fonts, of the text and of the code |
+
+A dark theme, say:
+
+```css
+:root[data-theme='dark'] {
+    --arg2p-surface: #1f2125;
+    --arg2p-border: #383c43;
+    --arg2p-text: #e3e5e8;
+    --arg2p-muted: #9aa0a8;
+    --arg2p-accent: #3fb0ac;
+}
+```
+
+The graph draws on a canvas: after the page changes theme, `restyle()` on `<arg2p-graph>` draws it in the new colours.
