@@ -40,6 +40,7 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | `flags: string` | `flags` | The flags, as Prolog facts |
 | `fileName: string` | `file-name` | The name the pictures of the graph and the drawing are saved as (`theory`) |
 | `theoryTab: boolean` | `theory-tab` | The theory edited in a tab of its own, for a page without an editor of its own |
+| `tab: string` | `tab` | The tab shown: `results` (the default), `flags`, `console`, `theory`, or the `id` of a tab of the page |
 | `busy: boolean` (read only) | `busy` (set by the solver) | A run is being started, or a solution computed |
 
 | Method | |
@@ -58,6 +59,7 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | `arg2p-theory-change` | `{ theory }` | The theory edited, by drawing or in its tab |
 | `arg2p-run` | `{ theory, query, flags }` | A run starts |
 | `arg2p-busy` | `{ busy }` | The solver is busy, or no longer |
+| `arg2p-tab-change` | `{ tab }` | Another tab shown: picked, or the solutions of a run, or where an error is |
 | `arg2p-error` | `{ error: EngineError }` | A run could not start, or a solution could not be computed (`error.stopped` when stopped) |
 | `arg2p-theory-error` | `{ problem: SyntaxProblem }` | Where the theory does not parse, without a Theory tab: the page has the theory |
 | `arg2p-solution` | `{ solution, run }` | A solution shown (`Solved`), from the solutions inside |
@@ -67,6 +69,16 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | --- | --- |
 | `actions` | At the end of the bar of the tabs: the actions of the page (a link, full screen, ...) |
 | `split` | Between the solutions and the graph: a handle that resizes them, setting `--arg2p-solutions-width` |
+| `tab` | The tabs of the page, after those of the solver: each element is one, named by its `id` and reading its `label` attribute, shown alone when picked |
+
+A page adds tabs of its own with elements in the slot `tab`; the solver follows them as they come, go and change
+their `label`:
+
+```html
+<arg2p-solver tab="notes">
+    <section slot="tab" id="notes" label="Notes">What the page shows in a tab of its own</section>
+</arg2p-solver>
+```
 
 | CSS | |
 | --- | --- |

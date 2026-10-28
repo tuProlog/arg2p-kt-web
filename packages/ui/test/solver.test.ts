@@ -105,7 +105,7 @@ async function solver(engine: Engine, setup: (it: Arg2pSolver) => void = () => {
     document.body.appendChild(element);
     await element.updateComplete;
     const events: { type: string; detail: any }[] = [];
-    for (const type of ['arg2p-run', 'arg2p-busy', 'arg2p-error', 'arg2p-theory-error', 'arg2p-query-change', 'arg2p-flags-change', 'arg2p-theory-change', 'arg2p-change']) {
+    for (const type of ['arg2p-run', 'arg2p-busy', 'arg2p-error', 'arg2p-theory-error', 'arg2p-query-change', 'arg2p-flags-change', 'arg2p-theory-change', 'arg2p-change', 'arg2p-tab-change']) {
         element.addEventListener(type, event => events.push({ type, detail: (event as CustomEvent).detail }));
     }
     const root = element.shadowRoot!;
@@ -278,6 +278,41 @@ describe('<arg2p-solver>', function () {
         );
         deepEqual(events[0].detail, { query: 'q(X)' });
         deepEqual(events[1].detail, { flags: 'debug.' });
+    });
+
+    it('should show the tabs of the page after its own, the one picked alone', async function () {
+        const { element, events, find } = await solver(new Fake([yes()]), it => {
+            it.innerHTML = '<div slot="tab" id="mine" label="Mine">mine</div><div slot="tab" id="other" label="Other">other</div>';
+            it.tab = 'mine';
+        });
+        const [mine, other] = [...element.children] as HTMLElement[];
+        const labels = () => [...find('.tabs').querySelectorAll('[role=tab]')].map(it => it.textContent!.trim());
+        deepEqual(labels(), ['Solutions', 'Flags', 'Console', 'Mine', 'Other']);
+        equal(find('[aria-selected=true]').textContent!.trim(), 'Mine');
+        deepEqual([mine.hidden, other.hidden], [false, true]);
+        equal(mine.getAttribute('role'), 'tabpanel');
+        ok(find<HTMLElement>('.panel.results').hidden);
+        // picked: the page is told
+        [...find('.tabs').querySelectorAll<HTMLButtonElement>('[role=tab]')].find(it => it.textContent!.trim() === 'Other')!.click();
+        await element.updateComplete;
+        deepEqual([mine.hidden, other.hidden], [true, false]);
+        deepEqual(events.filter(it => it.type === 'arg2p-tab-change').map(it => it.detail), [{ tab: 'other' }]);
+        // its label changed, and a tab gone: the solver follows
+        other.setAttribute('label', 'Other (2)');
+        mine.remove();
+        await settled();
+        await element.updateComplete;
+        deepEqual(labels(), ['Solutions', 'Flags', 'Console', 'Other (2)']);
+        // a run shows the solutions
+        await element.run();
+        await element.updateComplete;
+        equal(element.tab, 'results');
+        ok(other.hidden);
+        equal(find<HTMLElement>('.panel.results').hidden, false);
+        // a tab that is not there shows the solutions
+        element.tab = 'none';
+        await element.updateComplete;
+        equal(find<HTMLElement>('.panel.results').hidden, false);
     });
 
     it('should share the places of the arguments between the graph and the drawing', async function () {

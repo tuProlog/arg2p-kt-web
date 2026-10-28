@@ -15,7 +15,14 @@ import './arg2p-solutions.js';
 import type { Arg2pSolutions } from './arg2p-solutions.js';
 import { buttons, define, emit } from './shared.js';
 
+/** The tabs of the solver itself; those of the page are named by the ids of their elements */
 type Panel = 'results' | 'theory' | 'flags' | 'console';
+
+/** A tab of the page: its element, by its id, and what the tab reads */
+interface HostTab {
+    readonly id: string;
+    readonly label: string;
+}
 
 /** The query the editor suggests: the labelling of the statements */
 const QUERY = 'buildLabelSets(In, Out, Und)';
@@ -37,7 +44,10 @@ const QUERY = 'buildLabelSets(In, Out, Und)';
  * Those of the components inside come out too: `arg2p-solution`, `arg2p-positions`, `arg2p-toggle`, `arg2p-export`.
  *
  * Slots: `actions`, at the end of the bar of the tabs (links, full screen, ...); `split`, between the solutions and
- * the graph (a handle that resizes them, setting --arg2p-solutions-width).
+ * the graph (a handle that resizes them, setting --arg2p-solutions-width); `tab`, the tabs of the page: each element
+ * in it is a tab after those of the solver, named by its `id` and reading its `label` attribute, shown when picked.
+ * The tab shown is `tab` (`results`, `flags`, `console`, `theory`, or the id of a tab of the page), and
+ * `arg2p-tab-change` {tab} tells another one picked.
  */
 export class Arg2pSolver extends LitElement {
     static override properties = {
@@ -47,7 +57,8 @@ export class Arg2pSolver extends LitElement {
         flags: {},
         fileName: { attribute: 'file-name' },
         theoryTab: { type: Boolean, attribute: 'theory-tab' },
-        panel: { state: true },
+        tab: {},
+        hosted: { state: true },
         solved: { state: true },
         output: { state: true },
         notice: { state: true },
@@ -66,8 +77,12 @@ export class Arg2pSolver extends LitElement {
     fileName = 'theory';
     /** Whether the theory is edited in a tab of its own */
     theoryTab = false;
+    /** The tab shown: one of the solver (`results`, `flags`, `console`, `theory`), or the id of one of the page */
+    tab: Panel | string = 'results';
 
-    private panel: Panel = 'results';
+    // the tabs of the page, as its elements in the slot `tab` are now
+    private hosted: readonly HostTab[] = [];
+    private readonly observer = new MutationObserver(() => this.adopt());
     // the solution shown, what the run printed, and what a failure tells
     private solved: Solved | null = null;
     private output = '';
@@ -96,7 +111,7 @@ export class Arg2pSolver extends LitElement {
         this.reset();
         const run = this.runs;
         const request: SolveRequest = { theory: this.theory, query: this.query, flags: this.flags };
-        this.panel = 'results';
+        this.select('results');
         this.starting = true;
         emit(this, 'arg2p-run', request);
         await this.updateComplete;
@@ -141,7 +156,7 @@ export class Arg2pSolver extends LitElement {
             emit(this, 'arg2p-theory-error', { problem: syntax });
             return;
         }
-        this.panel = syntax.where;
+        this.select(syntax.where);
         this.updateComplete.then(() => {
             const details = this.find<HTMLDetailsElement>('.flags-text');
             if (syntax.where === 'flags' && details !== null) details.open = true;
@@ -159,6 +174,40 @@ export class Arg2pSolver extends LitElement {
     restyle(): void {
         this.find<Arg2pGraph>('arg2p-graph')?.restyle();
         this.find<Arg2pFramework>('arg2p-framework')?.restyle();
+    }
+
+    override connectedCallback(): void {
+        super.connectedCallback();
+        this.adopt();
+        this.observer.observe(this, { childList: true, subtree: true, attributes: true, attributeFilter: ['slot', 'id', 'label'] });
+    }
+
+    override disconnectedCallback(): void {
+        super.disconnectedCallback();
+        this.observer.disconnect();
+    }
+
+    // The tab shown: the one asked for, if there is one, or else the solutions
+    private get shown(): string {
+        const builtIn = this.tab === 'results' || this.tab === 'flags' || this.tab === 'console' || (this.tab === 'theory' && this.theoryTab);
+        return builtIn || this.hosted.some(it => it.id === this.tab) ? this.tab : 'results';
+    }
+
+    // The tab [tab] picked: the page is told
+    private select(tab: string): void {
+        if (tab === this.shown) return;
+        this.tab = tab;
+        emit(this, 'arg2p-tab-change', { tab });
+    }
+
+    // The elements of the page in the slot `tab`, as tabs
+    private adopt(): void {
+        const hosted = this.tabElements().map(it => ({ id: it.id, label: it.getAttribute('label') ?? it.id }));
+        if (JSON.stringify(hosted) !== JSON.stringify(this.hosted)) this.hosted = hosted;
+    }
+
+    private tabElements(): HTMLElement[] {
+        return [...this.children].filter((it): it is HTMLElement => it instanceof HTMLElement && it.slot === 'tab' && it.id !== '');
     }
 
     // The profile the theory is read in: the one it states, or the flags, or the default
@@ -211,20 +260,27 @@ export class Arg2pSolver extends LitElement {
     }
 
     protected override updated(changed: PropertyValues): void {
+        // the tabs of the page: the one picked shown alone
+        const shown = this.shown;
+        for (const element of this.tabElements()) {
+            element.setAttribute('role', 'tabpanel');
+            element.hidden = element.id !== shown;
+        }
         if (this.busy !== this.told) {
             this.told = this.busy;
             emit(this, 'arg2p-busy', { busy: this.busy });
         }
         // the graph, or the drawing, fits the room it is given once shown
-        if (changed.has('panel') || this.abstract !== this.wasAbstract) {
+        if (changed.has('tab') || this.abstract !== this.wasAbstract) {
             this.wasAbstract = this.abstract;
             this.fit();
         }
     }
 
     protected override render() {
-        const tab = (panel: Panel, text: string) => html`
-            <button type="button" role="tab" aria-selected=${this.panel === panel} class=${this.panel === panel ? 'active' : ''} @click=${() => (this.panel = panel)}>${text}</button>
+        const shown = this.shown;
+        const tab = (panel: string, text: string) => html`
+            <button type="button" role="tab" aria-selected=${shown === panel} class=${shown === panel ? 'active' : ''} @click=${() => this.select(panel)}>${text}</button>
         `;
         // what the components inside tell is told by the solver, as its own
         const own = (action: (detail: never) => void) => (event: CustomEvent) => {
@@ -252,7 +308,7 @@ export class Arg2pSolver extends LitElement {
             </div>
             <div class="tabs" part="tabs" role="tablist">
                 ${tab('results', 'Solutions')} ${this.theoryTab ? tab('theory', 'Theory') : nothing} ${tab('flags', 'Flags')}
-                ${tab('console', this.output === '' ? 'Console' : 'Console •')}
+                ${tab('console', this.output === '' ? 'Console' : 'Console •')} ${this.hosted.map(it => tab(it.id, it.label))}
                 <span class="profile" title=${info?.help ?? ''}>${info?.label ?? this.profile}</span>
                 <span class="spacer"></span>
                 <slot name="actions"></slot>
@@ -262,7 +318,7 @@ export class Arg2pSolver extends LitElement {
                 : html`<div class="notice" part="notice" role="status">
                       <span>${this.notice}</span><button type="button" class="dismiss" title="Dismiss" aria-label="Dismiss" @click=${() => (this.notice = null)}>×</button>
                   </div>`}
-            <div class="panel results" part="results" role="tabpanel" ?hidden=${this.panel !== 'results'}>
+            <div class="panel results" part="results" role="tabpanel" ?hidden=${shown !== 'results'}>
                 <arg2p-solutions
                     ?hide-exhausted-no=${abstract}
                     @arg2p-solution=${(e: CustomEvent<Solved>) => this.show(e.detail)}
@@ -291,7 +347,7 @@ export class Arg2pSolver extends LitElement {
                 </div>
             </div>
             ${this.theoryTab
-                ? html`<div class="panel theory" role="tabpanel" ?hidden=${this.panel !== 'theory'}>
+                ? html`<div class="panel theory" role="tabpanel" ?hidden=${shown !== 'theory'}>
                       <arg2p-editor
                           id="theory"
                           kind="theory"
@@ -303,7 +359,7 @@ export class Arg2pSolver extends LitElement {
                       ></arg2p-editor>
                   </div>`
                 : nothing}
-            <div class="panel flags" role="tabpanel" ?hidden=${this.panel !== 'flags'}>
+            <div class="panel flags" role="tabpanel" ?hidden=${shown !== 'flags'}>
                 <arg2p-flags
                     .engine=${this.engine}
                     .flags=${this.flags}
@@ -323,9 +379,10 @@ export class Arg2pSolver extends LitElement {
                     ></arg2p-editor>
                 </details>
             </div>
-            <div class="panel console" role="tabpanel" ?hidden=${this.panel !== 'console'}>
+            <div class="panel console" role="tabpanel" ?hidden=${shown !== 'console'}>
                 ${this.output === '' ? html`<p class="hint">What the theory and the query print (write/1, say) shows here.</p>` : html`<pre>${this.output}</pre>`}
             </div>
+            <div class="panel hosted" ?hidden=${!this.hosted.some(it => it.id === shown)}><slot name="tab"></slot></div>
         `;
     }
 
@@ -484,8 +541,12 @@ export class Arg2pSolver extends LitElement {
                 flex: 1;
             }
             .flags,
-            .console {
+            .console,
+            .hosted {
                 overflow: auto;
+            }
+            ::slotted([hidden]) {
+                display: none !important;
             }
             .flags-text summary {
                 cursor: pointer;
