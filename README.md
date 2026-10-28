@@ -68,6 +68,20 @@ ICCMA'23 files as theories, and exported to APX and TGF.
   <img src="docs/phone.png" width="200" alt="The drawing on a phone">
 </p>
 
+## Federation
+
+The *Federation* tab pairs the playground with that of another device on the same network, with no server: each lends
+the other the workers of its Web Workers, and a statement is solved by the workers of both (the federation of the
+[parallel solver](https://tuprolog.github.io/arg2p-kt/docs/modules/parallel-solver/)).
+
+1. *Invite a device* shows a QR code, and a link: the other device scans it with its camera (or opens the link), and
+   its playground shows a reply, as a QR code and a link.
+2. *Scan its reply* reads it with the camera of the first device (or paste it, or open the reply link on that device:
+   the page that invited takes it).
+
+Once paired, *Solve on the federation* gives the arguments of a statement of the theory, in, out and und. A device runs
+the theories the others send it: pair only with devices you trust.
+
 ## Sharing a setup
 
 *Share* builds a link to the theory, query and flags shown: it packs them in a single compressed

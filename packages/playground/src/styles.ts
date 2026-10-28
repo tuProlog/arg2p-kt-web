@@ -395,7 +395,8 @@ export const styles = css`
         display: none;
     }
     .flags,
-    .console {
+    .console,
+    .federation {
         overflow: auto;
     }
     .flags-text summary {
