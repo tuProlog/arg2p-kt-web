@@ -6,20 +6,15 @@ import { Compartment, EditorState, Prec, type Extension, type Text } from '@code
 import { EditorView, drawSelection, keymap, lineNumbers, placeholder } from '@codemirror/view';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { arg2p } from '../editor/language.js';
+import { keepView, rangeOf } from '../editor/view.js';
 import type { Engine, SyntaxProblem } from '../engine.js';
 import { tokens } from '../theme.js';
+import { activate, define, emit } from './shared.js';
 
 // How long the typing is let be before the text is checked
 const CHECK_DELAY = 500;
 
 export type EditorKind = 'theory' | 'query' | 'flags';
-
-/** Where [problem] is in [doc]: its token, held within the text */
-export function rangeOf(doc: Text, problem: Pick<SyntaxProblem, 'line' | 'column' | 'length'>): { from: number; to: number } {
-    const line = doc.line(Math.max(1, Math.min(problem.line, doc.lines)));
-    const from = line.from + Math.max(0, Math.min(problem.column - 1, line.length));
-    return { from, to: Math.max(from, Math.min(from + problem.length, line.to)) };
-}
 
 /**
  * An editor of a theory, a query or flags, in the language of arg2p. The engine checks the text once the typing
@@ -44,27 +39,27 @@ export class Arg2pEditor extends LitElement {
     kind: EditorKind = 'theory';
     /** What checks the text; without it, the text is not checked */
     engine: Pick<Engine, 'check'> | null = null;
-    /** What the text is called in the messages (the theory, the flags, ...) */
+    /** What the text is called, by the messages and by readers of the screen (the theory, the flags, ...) */
     label = '';
     placeholder = '';
     readonly = false;
 
-    // the syntax error shown, if any
+    // the syntax error shown, if any, and how many were reported (a check started before one does not hide it)
     private problem: SyntaxProblem | null = null;
+    private reports = 0;
     private view: EditorView | null = null;
+    // what follows the properties: the kind of text, its name, whether it is edited, its placeholder, its check
+    private readonly shape = new Compartment();
+    private readonly named = new Compartment();
     private readonly editable = new Compartment();
     private readonly hint = new Compartment();
     private readonly checking = new Compartment();
-
-    /** The editor, for what the element does not do itself */
-    get editor(): EditorView | null {
-        return this.view;
-    }
 
     /** Shows [problem] (found by running, say) at once, and takes the editor to it */
     report(problem: SyntaxProblem): void {
         const view = this.view;
         if (view === null) return;
+        this.reports++;
         view.dispatch(setDiagnostics(view.state, [this.diagnostic(view.state.doc, problem)]));
         this.problem = problem;
         this.reveal(problem.line, problem.column);
@@ -89,6 +84,7 @@ export class Arg2pEditor extends LitElement {
             parent: this.renderRoot.querySelector<HTMLElement>('.editor')!,
             state: EditorState.create({ doc: this.value, extensions: this.extensions() }),
         });
+        keepView(this, this.view);
     }
 
     protected override updated(changed: PropertyValues): void {
@@ -97,15 +93,21 @@ export class Arg2pEditor extends LitElement {
         if (changed.has('value') && this.value !== view.state.doc.toString()) {
             view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: this.value } });
         }
-        if (changed.has('readonly')) view.dispatch({ effects: this.editable.reconfigure(EditorState.readOnly.of(this.readonly)) });
-        if (changed.has('placeholder')) view.dispatch({ effects: this.hint.reconfigure(placeholder(this.placeholder)) });
-        if (changed.has('engine') || changed.has('kind')) view.dispatch({ effects: this.checking.reconfigure(this.check()) });
+        const effects = [
+            changed.has('kind') ? this.shape.reconfigure(this.shaped()) : null,
+            changed.has('label') || changed.has('kind') ? this.named.reconfigure(this.name()) : null,
+            changed.has('readonly') ? this.editable.reconfigure(EditorState.readOnly.of(this.readonly)) : null,
+            changed.has('placeholder') ? this.hint.reconfigure(placeholder(this.placeholder)) : null,
+            changed.has('engine') || changed.has('kind') ? this.checking.reconfigure(this.check()) : null,
+        ].filter(it => it !== null);
+        if (effects.length > 0) view.dispatch({ effects });
     }
 
     override disconnectedCallback(): void {
         super.disconnectedCallback();
         this.view?.destroy();
         this.view = null;
+        keepView(this, null);
     }
 
     override connectedCallback(): void {
@@ -114,23 +116,15 @@ export class Arg2pEditor extends LitElement {
     }
 
     private extensions(): Extension[] {
-        const query = this.kind === 'query';
         return [
             arg2p(),
             history(),
             drawSelection(),
             bracketMatching(),
             highlightSelectionMatches(),
-            query ? [] : lineNumbers(),
-            query ? [] : EditorView.lineWrapping,
-            // a query is one line: Enter submits it, and a text pasted in is joined on one line
-            query
-                ? [
-                      Prec.highest(keymap.of([{ key: 'Enter', run: () => (this.emit('arg2p-submit', { value: this.value }), true) }])),
-                      EditorState.transactionFilter.of(tr => (tr.newDoc.lines > 1 ? [tr, { changes: { from: 0, to: tr.newDoc.length, insert: tr.newDoc.toString().replace(/\s*\n\s*/g, ' ') }, sequential: true }] : tr)),
-                  ]
-                : [],
+            this.shape.of(this.shaped()),
             keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+            this.named.of(this.name()),
             this.editable.of(EditorState.readOnly.of(this.readonly)),
             this.hint.of(placeholder(this.placeholder)),
             this.checking.of(this.check()),
@@ -139,7 +133,7 @@ export class Arg2pEditor extends LitElement {
                 const value = update.state.doc.toString();
                 if (value === this.value) return;
                 this.value = value;
-                this.emit('arg2p-change', { value });
+                emit(this, 'arg2p-change', { value });
             }),
             EditorView.theme({
                 '&': { height: '100%', backgroundColor: 'var(--_surface)', color: 'var(--_text)' },
@@ -158,7 +152,23 @@ export class Arg2pEditor extends LitElement {
         ];
     }
 
-    // The check of the text by the engine, once the typing settles: the problem it finds is shown under the editor too
+    // A query is one line: Enter submits it, and a text pasted in is joined on one line; the others have lines
+    private shaped(): Extension {
+        if (this.kind !== 'query') return [lineNumbers(), EditorView.lineWrapping];
+        return [
+            Prec.highest(keymap.of([{ key: 'Enter', run: () => (emit(this, 'arg2p-submit', { value: this.value }), true) }])),
+            EditorState.transactionFilter.of(tr => (tr.newDoc.lines > 1 ? [tr, { changes: { from: 0, to: tr.newDoc.length, insert: tr.newDoc.toString().replace(/\s*\n\s*/g, ' ') }, sequential: true }] : tr)),
+        ];
+    }
+
+    // The name readers of the screen give the text
+    private name(): Extension {
+        return EditorView.contentAttributes.of({ 'aria-label': this.label || this.kind });
+    }
+
+    // The check of the text by the engine, once the typing settles: the problem it finds is shown under the editor too,
+    // unless the text changed meanwhile, or a problem was reported meanwhile (by running: it stays until the text
+    // changes)
     private check(): Extension {
         const engine = this.engine;
         if (engine === null) return [];
@@ -166,14 +176,16 @@ export class Arg2pEditor extends LitElement {
         return linter(
             async view => {
                 const doc = view.state.doc;
+                const reports = this.reports;
                 let problem: SyntaxProblem | null = null;
                 try {
                     problem = await engine.check(doc.toString(), kind);
                 } catch {
                     // an engine that cannot check now (stopped, say) finds nothing
                 }
-                this.problem = problem;
-                return problem === null ? [] : [this.diagnostic(doc, problem)];
+                if (view.state.doc !== doc || this.reports !== reports) problem = this.problem;
+                else this.problem = problem;
+                return problem === null ? [] : [this.diagnostic(view.state.doc, problem)];
             },
             { delay: CHECK_DELAY },
         );
@@ -183,29 +195,15 @@ export class Arg2pEditor extends LitElement {
         return { ...rangeOf(doc, problem), severity: 'error', message: problem.message, source: 'arg2p' };
     }
 
-    private emit(type: string, detail: unknown): void {
-        this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
-    }
-
     protected override render() {
         const problem = this.problem;
+        const reveal = () => problem !== null && this.reveal(problem.line, problem.column);
         return html`
             <div class="editor"></div>
             ${problem === null
                 ? nothing
                 : html`
-                      <div
-                          class="problem"
-                          role="button"
-                          tabindex="0"
-                          title="Go to the error"
-                          @click=${() => this.reveal(problem.line, problem.column)}
-                          @keydown=${(e: KeyboardEvent) => {
-                              if (e.key !== 'Enter' && e.key !== ' ') return;
-                              e.preventDefault();
-                              this.reveal(problem.line, problem.column);
-                          }}
-                      >
+                      <div class="problem" role="button" tabindex="0" title="Go to the error" @click=${reveal} @keydown=${(e: KeyboardEvent) => activate(e, reveal)}>
                           <span class="place">${this.label ? `${this.label}, ` : ''}line ${problem.line}, col ${problem.column}</span>
                           <span>${problem.message}</span>
                       </div>
@@ -251,7 +249,7 @@ export class Arg2pEditor extends LitElement {
     ];
 }
 
-customElements.define('arg2p-editor', Arg2pEditor);
+define('arg2p-editor', Arg2pEditor);
 
 declare global {
     interface HTMLElementTagNameMap {

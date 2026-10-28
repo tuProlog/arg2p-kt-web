@@ -5,6 +5,6 @@ export { tokens, labelColor } from './theme.js';
 export { Arg2pGraph } from './components/arg2p-graph.js';
 export { Arg2pFramework } from './components/arg2p-framework.js';
 export { Arg2pSolutions, listItems } from './components/arg2p-solutions.js';
-export { Arg2pEditor, rangeOf, type EditorKind } from './components/arg2p-editor.js';
+export { Arg2pEditor, type EditorKind } from './components/arg2p-editor.js';
 export { Arg2pFlags, type Source } from './components/arg2p-flags.js';
 export { arg2p, arg2pLanguage } from './editor/language.js';
