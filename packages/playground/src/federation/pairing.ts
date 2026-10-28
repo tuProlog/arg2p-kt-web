@@ -149,6 +149,8 @@ export interface InvitingOptions {
     readonly base: string;
     /** Told whether the relay can be read, each time that changes */
     readonly reached?: (ok: boolean) => void;
+    /** Told when a reply opened in another page of this device paired */
+    readonly handedOff?: () => void;
     readonly channels?: Channels;
     readonly fetch?: Fetch;
 }
@@ -184,7 +186,7 @@ export class Inviting {
         const relay = new Relay(invitation.relay, options.fetch);
         this.stopRelay = relay.subscribe(invitation.topic, message => void this.received(message), options.reached);
         this.channel = (options.channels ?? broadcast)();
-        this.channel?.addEventListener('message', event => void this.handedOff(event.data as HandOff));
+        this.channel?.addEventListener('message', event => void this.handedOff(event.data as HandOff, options.handedOff ?? (() => {})));
     }
 
     /** The topic of the relay the replies go to: the invitation, among those of the pages of this device */
@@ -203,12 +205,14 @@ export class Inviting {
                 `Waiting for a reply with the code ${wanted}`,
             ).finally(() => (this.wanted = null)));
         await this.complete(answer);
+        this.close();
     }
 
     /** Pairs with [reply] (a reply link scanned, pasted, or opened on this device): false when it answers another invitation */
     async take(reply: Reply): Promise<boolean> {
         if (reply.topic !== this.invitation.topic) return false;
         await this.complete(reply.answer);
+        this.close();
         return true;
     }
 
@@ -219,13 +223,13 @@ export class Inviting {
         this.channel?.close();
     }
 
+    // The pairing completed with [answer]: the invitation is closed by the caller, once it told what it has to
     private async complete(answer: string): Promise<void> {
         if (this.closed) throw new Error('This invitation was dropped: invite again.');
         if (this.busy) throw new Error('A reply is already completing the pairing.');
         this.busy = true;
         try {
             await withTimeout(this.peer.complete(answer), PAIRING_TIMEOUT, 'Completing the pairing');
-            this.close();
         } finally {
             this.busy = false;
         }
@@ -244,14 +248,15 @@ export class Inviting {
     }
 
     // A reply opened in another page of this device: this page pairs with it if it answers its invitation, and tells
-    private async handedOff(message: HandOff): Promise<void> {
+    private async handedOff(message: HandOff, paired: () => void): Promise<void> {
         if (message.type !== 'reply' || message.reply.topic !== this.invitation.topic) return;
-        const channel = this.channel;
         try {
-            await this.take(message.reply);
-            channel?.postMessage({ type: 'paired', topic: message.reply.topic } satisfies HandOff);
+            await this.complete(message.reply.answer);
+            this.channel?.postMessage({ type: 'paired', topic: message.reply.topic } satisfies HandOff);
+            this.close();
+            paired();
         } catch (error) {
-            channel?.postMessage({ type: 'failed', topic: message.reply.topic, message: messageOf(error) } satisfies HandOff);
+            this.channel?.postMessage({ type: 'failed', topic: message.reply.topic, message: messageOf(error) } satisfies HandOff);
         }
     }
 }

@@ -82,7 +82,8 @@ export class Federation {
     private cluster: Promise<Cluster> | null = null;
     // the cluster, once started
     private ready: Cluster | null = null;
-    private inviting: Inviting | null = null;
+    // the invitation going on
+    private current: Inviting | null = null;
     private known: FederationStats | null = null;
     private readonly listeners = new Set<() => void>();
 
@@ -139,9 +140,14 @@ export class Federation {
      */
     async invite(base: string, reached: (ok: boolean) => void): Promise<string> {
         this.dropInvitation();
-        const inviting = await Inviting.start(await this.started(), { relay: this.relay, base, reached });
-        this.inviting = inviting;
+        const inviting = await Inviting.start(await this.started(), { relay: this.relay, base, reached, handedOff: () => this.paired() });
+        this.current = inviting;
         return inviting.link;
+    }
+
+    /** Whether an invitation is going on: none once it paired, or was dropped */
+    get inviting(): boolean {
+        return this.current !== null;
     }
 
     /** Pairs with the reply to the invitation whose code is [code], once it comes */
@@ -160,8 +166,8 @@ export class Federation {
 
     /** Drops the invitation going on: no reply pairs with it any longer */
     dropInvitation(): void {
-        this.inviting?.close();
-        this.inviting = null;
+        this.current?.close();
+        this.current = null;
     }
 
     /** Joins the invitation of the link [code]: what to show the device that invited */
@@ -190,12 +196,12 @@ export class Federation {
     }
 
     private invitation(): Inviting {
-        if (this.inviting === null) throw new Error('No invitation is going on: invite first.');
-        return this.inviting;
+        if (this.current === null) throw new Error('No invitation is going on: invite first.');
+        return this.current;
     }
 
     private paired(): void {
-        this.inviting = null;
+        this.current = null;
         this.changed();
     }
 

@@ -63,7 +63,7 @@ function fakePeer(name: string) {
     return { peer, completed };
 }
 
-/** The pages of a device, on one channel */
+/** The pages of a device, on one channel: what one posts the others are told, as a BroadcastChannel does */
 function fakeChannels(): Channels {
     const pages = new Set<{ listeners: ((event: { data: unknown }) => void)[] }>();
     return () => {
@@ -71,7 +71,10 @@ function fakeChannels(): Channels {
         pages.add(page);
         return {
             addEventListener: (_: string, listener: (event: { data: unknown }) => void) => page.listeners.push(listener),
-            postMessage: (data: unknown) => [...pages].filter(it => it !== page).forEach(it => it.listeners.forEach(listener => setTimeout(() => listener({ data: structuredClone(data) })))),
+            postMessage: (data: unknown) => {
+                if (!pages.has(page)) throw new Error('Channel is closed');
+                [...pages].filter(it => it !== page).forEach(it => it.listeners.forEach(listener => setTimeout(() => listener({ data: structuredClone(data) }))));
+            },
             close: () => pages.delete(page),
         } as unknown as BroadcastChannel;
     };
@@ -158,8 +161,9 @@ describe('The pairing', function () {
         const first = fakePeer('first');
         const second = fakePeer('second');
         // two pages of this device invite
-        const inviting = await Inviting.start(first.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels });
-        const another = await Inviting.start(second.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels });
+        const told: string[] = [];
+        const inviting = await Inviting.start(first.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels, handedOff: () => told.push('first') });
+        const another = await Inviting.start(second.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels, handedOff: () => told.push('second') });
         try {
             const invitation = decodeInvitation(readPairing(new URL(another.link).hash)!.code)!;
             relay.state.down = true;
@@ -169,6 +173,7 @@ describe('The pairing', function () {
             deepEqual(answered, { paired: true });
             deepEqual(first.completed, []);
             deepEqual(second.completed, ['answer-of-b-to-offer-of-second']);
+            deepEqual(told, ['second']);
             // a reply to no invitation of this device: no page answers
             assert.isNull(await handOff({ topic: 'arg2p-nobodyhere', answer: 'answer-x' }, 200, channels));
         } finally {

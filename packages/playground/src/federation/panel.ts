@@ -66,7 +66,7 @@ export class Arg2pFederation extends LitElement {
 
     override connectedCallback(): void {
         super.connectedCallback();
-        this.unfollow = followPairingLinks(window, link => this.opened(link));
+        this.unfollow = followPairingLinks(window, link => void this.opened(link));
         document.addEventListener('visibilitychange', this.pageHidden);
     }
 
@@ -83,7 +83,12 @@ export class Arg2pFederation extends LitElement {
         if (changed.has('federation')) {
             this.unsubscribe?.();
             const federation = this.federation;
-            this.unsubscribe = federation?.subscribe(() => (this.stats = federation.stats)) ?? null;
+            this.unsubscribe =
+                federation?.subscribe(() => {
+                    this.stats = federation.stats;
+                    // paired by a reply opened in another page of this device
+                    if (this.step.kind === 'inviting' && !federation.inviting) this.paired();
+                }) ?? null;
             this.stats = federation?.stats ?? null;
         }
     }
@@ -96,8 +101,10 @@ export class Arg2pFederation extends LitElement {
         if (document.hidden) this.cancelScan();
     };
 
-    // A link of a pairing opened here: an invitation is joined once confirmed, a reply handed to the page that invited
-    private opened(link: PairingLink): void {
+    // A link of a pairing opened here: an invitation is joined once confirmed, a reply handed to the page that invited.
+    // The page is asked to show the panel once it is drawn (the link of the page comes as it draws it).
+    private async opened(link: PairingLink): Promise<void> {
+        await this.updateComplete;
         this.dispatchEvent(new CustomEvent('arg2p-reveal', { bubbles: true, composed: true }));
         if (link.kind === 'join') {
             this.go({ kind: 'confirm', code: link.code });
