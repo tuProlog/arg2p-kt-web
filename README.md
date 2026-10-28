@@ -1,10 +1,19 @@
-<p align="center"><img src="assets/pwa/icon.svg" width="200" alt="A2P logo"></p>
+<p align="center"><img src="packages/playground/assets/pwa/icon.svg" width="200" alt="A2P logo"></p>
 
 # [Arg2P-Kt](https://github.com/tuProlog/arg2p-kt) Web Playground
 
 Try it at <https://tuprolog.github.io/arg2p-kt-web/>. The playground can be
 installed as an app (*Install app* in Chrome and Edge, *Add to Home Screen* on
 iOS) and then works offline.
+
+## Packages
+
+- [`packages/ui`](packages/ui): `@tuprolog/arg2p-ui`, the user interface of
+  Arg2P as web components (the argument graph, the solutions, the drawing of
+  abstract frameworks), on any engine: the solver of the browser
+  (`@tuprolog/arg2p-ui/js`), or one of the JVM.
+- [`packages/playground`](packages/playground): the playground, the page
+  published on GitHub Pages.
 
 ## Install
 ```bash
@@ -13,28 +22,29 @@ iOS) and then works offline.
 
 ## Usage
 
-- Start Webpack Dev server
+- Start the dev server of the playground, or the page the components are tried on
 
 ```bash
-  npm start
+  npm start -w packages/playground
+  npm run dev -w packages/ui
 ```
 
-- Run mocha test
+- Run the tests of every package
 
 ```bash
   npm test
 ```
 
-- Build and create production ready artifacts in `prodDist` folder
+- Build every package (the playground in `packages/playground/prodDist`)
 
 ```bash
   npm run build
 ```
 
-- Deploy `prodDist` folder to Githun Pages
+- Deploy the playground to GitHub Pages
 
 ```bash
-  npm run deploy
+  npm run deploy -w packages/playground
 ```
 
 ## Modes
