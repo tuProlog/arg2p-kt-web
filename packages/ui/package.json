@@ -15,6 +15,30 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./solver": {
+      "types": "./dist/components/arg2p-solver.d.ts",
+      "import": "./dist/components/arg2p-solver.js"
+    },
+    "./graph": {
+      "types": "./dist/components/arg2p-graph.d.ts",
+      "import": "./dist/components/arg2p-graph.js"
+    },
+    "./framework": {
+      "types": "./dist/components/arg2p-framework.d.ts",
+      "import": "./dist/components/arg2p-framework.js"
+    },
+    "./solutions": {
+      "types": "./dist/components/arg2p-solutions.d.ts",
+      "import": "./dist/components/arg2p-solutions.js"
+    },
+    "./editor": {
+      "types": "./dist/components/arg2p-editor.d.ts",
+      "import": "./dist/components/arg2p-editor.js"
+    },
+    "./flags": {
+      "types": "./dist/components/arg2p-flags.d.ts",
+      "import": "./dist/components/arg2p-flags.js"
+    },
     "./data": {
       "types": "./dist/data.d.ts",
       "import": "./dist/data.js"
