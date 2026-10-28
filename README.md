@@ -25,8 +25,8 @@ iOS) and then works offline.
 - Start the dev server of the playground, or the page the components are tried on
 
 ```bash
-  npm start -w packages/playground
-  npm run dev -w packages/ui
+  npm start -w @tuprolog/arg2p-playground
+  npm run dev -w @tuprolog/arg2p-ui
 ```
 
 - Run the tests of every package
@@ -35,7 +35,7 @@ iOS) and then works offline.
   npm test
 ```
 
-- Build every package (the playground in `packages/playground/prodDist`)
+- Build every package (the playground in `packages/playground/dist`)
 
 ```bash
   npm run build
@@ -44,43 +44,41 @@ iOS) and then works offline.
 - Deploy the playground to GitHub Pages
 
 ```bash
-  npm run deploy -w packages/playground
+  npm run deploy -w @tuprolog/arg2p-playground
 ```
 
-## Modes
+## Theories and profiles
 
-The playground runs in one of two modes, selected from the toolbar:
+A theory is read in a **profile** (see [Profiles](https://tuprolog.github.io/arg2p-kt/docs/profiles/)):
+ASPIC<sup>+</sup> by default, or the one it states, as `graphBuildMode(aba).`, or the one picked
+in the *Flags* tab, which shows the flags the profile presets and where each value comes from.
 
-- **Structured** — write an ASPIC<sup>+</sup> theory and run any query against it.
-- **Abstract** — draw an abstract argumentation framework and evaluate it, the way
-  ConArg does. Use the toolbar on the canvas to add arguments and attacks; the
-  query is generated for you as `abstract::solve(Arguments, Attacks, In, Out, Und)`
-  and the drawn graph is recoloured with the labelling of the solution currently
-  shown. The semantics comes from the `argumentLabellingMode` flag, which the
-  *Semantics* selector next to the query keeps in sync.
+An abstract framework is a theory of the profile `abstract`: `a.` an argument, `a -> b.` an
+attack, `a <-> b.` a mutual one, and Prolog clauses may derive them
+(`X -> Y :- beats(X, Y).`). Its arguments and attacks can also be **drawn**: the *Drawing* view
+writes what is drawn into the theory, draws the theory as it is edited, colours the arguments
+with the labelling of the solution shown, and draws dashed what the theory derives. Frameworks
+in the formats of ICCMA (APX, TGF, ICCMA'23) are imported as theories, and exported.
 
 ## Sharing a setup
 
-The playground restores its state from the query string, so an example can be
-handed over as a plain link. *Share* in the toolbar builds one from whatever is
-currently loaded: it packs the whole state in a single compressed `s`
-parameter. Links can also be written by hand with the plain parameters below,
-which keep working.
+*Share* builds a link to the theory, query and flags shown: it packs them in a single compressed
+`s` parameter, and the link opens them in a tab of their own, and runs them. Links can also be
+written by hand with the plain parameters below.
 
-| Parameter | Mode | Meaning |
-| --- | --- | --- |
-| `mode` | both | `structured` (default) or `abstract` |
-| `flags` | both | Content of the *Flags* tab |
-| `theory` | structured | Content of the *Theory* editor |
-| `query` | structured | Content of the *Query* editor |
-| `arguments` | abstract | Argument names, e.g. `a,b,c` |
-| `attacks` | abstract | Attacks as `attacker-attacked`, e.g. `a-b,b-c` |
+| Parameter | Meaning |
+| --- | --- |
+| `theory` | The theory |
+| `query` | The query |
+| `flags` | The flags, as Prolog facts |
+| `arguments` | The arguments of an abstract framework, e.g. `a,b,c` |
+| `attacks` | Its attacks as `attacker-attacked`, e.g. `a-b,b-c` |
 
-Every value is percent-encoded. Argument names have to be Prolog atoms; invalid
-ones are dropped and reported. Arguments mentioned only in `attacks` are added to
-the graph, so `?mode=abstract&attacks=a-b,b-a` is enough to describe a two
-argument framework.
+Every value is percent-encoded. A framework given by `arguments` and `attacks` becomes a theory of
+the profile `abstract`; arguments mentioned only in `attacks` are added, so
+`?attacks=a-b,b-a` is enough to describe a two argument framework. The links of the former
+playground (its abstract mode, and the flags of `standard_af`) keep working.
 
 ```
-?mode=abstract&arguments=a,b,c&attacks=a-b,b-a,b-c&flags=argumentLabellingMode(preferred).
+?arguments=a,b,c&attacks=a-b,b-a,b-c&flags=argumentLabellingMode(preferred).
 ```

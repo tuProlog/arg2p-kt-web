@@ -23,7 +23,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          sed -i "s/VERSION/$(grep '"@tuprolog/arg2p"' packages/playground/package.json | sed -E 's/.*: *"([^"]+)".*/\1/')/g" packages/playground/assets/index.html
       - name: Run tests
         run: |
           npm test
@@ -34,7 +33,7 @@ jobs:
         if: github.ref_name == 'master'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: packages/playground/prodDist
+          folder: packages/playground/dist
   success:
     runs-on: ubuntu-26.04
     needs:
