@@ -21,18 +21,27 @@ function host() {
     return { posted, send };
 }
 
-// The engine of the browser on a host in the same thread, answering as a worker would (later)
-function engine(): JsEngine {
+// The engine of the browser on a host in the same thread, answering as a worker would (later); the channels it
+// opened, last the one in use
+function engine(channels: Channel[] = []): JsEngine {
     return new JsEngine(() => {
         const channel: Channel = {
             onmessage: null,
+            onerror: null,
             postMessage: request => setTimeout(() => handle(request), 0),
             terminate: () => {},
         };
         const { handle } = createHost(answer => channel.onmessage?.({ data: answer }));
+        channels.push(channel);
         return channel;
     });
 }
+
+const failure = (promise: Promise<unknown>) =>
+    promise.then(
+        () => null,
+        (it: unknown) => it as { name: string; stopped?: boolean },
+    );
 
 describe('Host of the engine', function () {
     it('should warm up', function () {
@@ -177,15 +186,58 @@ describe('Engine of the browser', function () {
         equal(error?.syntax?.where, 'theory');
     });
 
-    it('should stop what it is waited for', async function () {
-        const solving = engine();
-        const pending = solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+    it('should stop what it is waited for, and end the queries of the worker it ends', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const run = await solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        const pending = run.next();
         solving.stop();
-        const error = await pending.then(
-            () => null,
-            (it: unknown) => it as { stopped?: boolean },
-        );
-        equal(error?.stopped, true);
+        equal((await failure(pending))?.stopped, true);
+        equal(channels.length, 2);
+        // its query went with the worker: no Next on it
+        equal(run.hasNext(), false);
+    });
+
+    it('should leave the worker be when it is stopped with nothing to stop', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const run = await solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        solving.stop();
+        equal(channels.length, 1);
+        ok(run.hasNext());
+        equal((await run.next()).result, 'yes');
+    });
+
+    it('should give every solution asked for, even asked for at once', async function () {
+        const run = await engine().solve({ theory: 'r1 :=> a.\nr2 :=> -a.\n', query: 'buildLabelSets(In, Out, Und)', flags: FLAGS });
+        const [first, second] = await Promise.all([run.next(), run.next()]);
+        equal(first.result, 'yes');
+        equal(second.result, 'yes');
+        ok(JSON.stringify(first.bindings) !== JSON.stringify(second.bindings));
+    });
+
+    it('should pass on the output of the latest query alone, to where it was asked', async function () {
+        const solving = engine();
+        const [one, two]: string[][] = [[], []];
+        const first = await solving.solve({ theory: '', query: 'write(one)', flags: FLAGS }, text => one.push(text));
+        await first.next();
+        const second = await solving.solve({ theory: '', query: 'write(two)', flags: FLAGS }, text => two.push(text));
+        await second.next();
+        deepEqual(one, ['one']);
+        deepEqual(two, ['two']);
+        // the query replaced has no more solutions
+        equal(first.hasNext(), false);
+    });
+
+    it('should start a fresh worker after an error of its own, failing what was waited for', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const pending = solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        channels[0].onerror!({ message: 'out of memory', preventDefault: () => {} });
+        equal((await failure(pending))?.name, 'Solver error');
+        equal(channels.length, 2);
+        const run = await solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        equal((await run.next()).result, 'yes');
     });
 
     it('should give the settings in effect', async function () {
