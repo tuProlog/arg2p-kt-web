@@ -19,6 +19,10 @@ export const tokens = css`
         --_support: var(--arg2p-support, #9a9a9a);
         --_no: var(--arg2p-no, #c9a400);
         --_error: var(--arg2p-error, #b00020);
+        --_atom: var(--arg2p-atom, #800000);
+        --_functor: var(--arg2p-functor, #6a1b9a);
+        --_variable: var(--arg2p-variable, var(--_text));
+        --_comment: var(--arg2p-comment, #808080);
         --_font: var(--arg2p-font, system-ui, sans-serif);
         --_mono: var(--arg2p-mono, ui-monospace, monospace);
         color: var(--_text);

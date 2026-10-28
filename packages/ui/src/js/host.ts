@@ -1,5 +1,6 @@
 import { Arg2p, Flags, Value, type Graph, type Solutions } from '@tuprolog/arg2p';
 import { EMPTY_GRAPH, type EngineError, type GraphData, type SolutionData, type SyntaxProblem } from '../engine.js';
+import { FLAGS, type Settings } from '../flags/schema.js';
 
 // The solver's side of the engine of the browser (see JsEngine): it answers messages, posting its answers with `post`.
 // Kept apart from the worker, so that it runs (and is tested) anywhere.
@@ -10,6 +11,7 @@ import { EMPTY_GRAPH, type EngineError, type GraphData, type SolutionData, type 
 //   { type: 'next', id }                              -> { type: 'solution', id, solution, hasNext }
 //   { type: 'graphAt', id, branch, reqId }            -> { type: 'graph', reqId, graph }
 //   { type: 'check', reqId, text, kind }              -> { type: 'checked', reqId, problem }
+//   { type: 'settings', reqId, theory, flags }        -> { type: 'settings', reqId, settings }
 //
 // Only the latest query is kept: a new one replaces it.
 
@@ -18,7 +20,8 @@ export type Request =
     | { type: 'solve'; id: number; theory: string; query: string; flags: string }
     | { type: 'next'; id: number }
     | { type: 'graphAt'; id: number; branch: number; reqId: number }
-    | { type: 'check'; reqId: number; text: string; kind: 'theory' | 'query' };
+    | { type: 'check'; reqId: number; text: string; kind: 'theory' | 'query' }
+    | { type: 'settings'; reqId: number; theory: string; flags: string };
 
 export type Answer =
     | { type: 'warm' }
@@ -27,7 +30,8 @@ export type Answer =
     | { type: 'output'; id: number; text: string }
     | { type: 'solution'; id: number; solution: SolutionData; hasNext: boolean }
     | { type: 'graph'; reqId: number; graph: GraphData }
-    | { type: 'checked'; reqId: number; problem: SyntaxProblem | null };
+    | { type: 'checked'; reqId: number; problem: SyntaxProblem | null }
+    | { type: 'settings'; reqId: number; settings: Settings };
 
 const WARM_UP_THEORY = 'f1 :=> bird(tweety).\nr1 : bird(X) => flies(X).\nf2 :=> -flies(tweety).';
 
@@ -41,6 +45,7 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
             case 'next': return next(request.id);
             case 'graphAt': return graphAt(request);
             case 'check': return post({ type: 'checked', reqId: request.reqId, problem: check(request.text, request.kind) });
+            case 'settings': return post({ type: 'settings', reqId: request.reqId, settings: settings(request.theory, request.flags) });
         }
     }
 
@@ -181,6 +186,52 @@ export function check(text: string, kind: 'theory' | 'query'): SyntaxProblem | n
     } catch (error) {
         return syntaxProblem(error) ?? { line: 1, column: 1, length: 1, message: messageOf(error) };
     }
+}
+
+/**
+ * The values of the flags in effect for [theory] solved with [flags], as the solver checks them (setting/1 for a
+ * switch, setting/2 for the values of a flag): the flags alone when the theory does not parse, none when they do not
+ * (until the API gives them)
+ */
+export function settings(theory: string, flags: string): Settings {
+    let parsed: Flags;
+    try {
+        parsed = Flags.parse(flags);
+    } catch {
+        return {};
+    }
+    let solver: Arg2p;
+    try {
+        solver = Arg2p.of(theory, parsed);
+    } catch {
+        solver = Arg2p.of('', parsed);
+    }
+    const values: Record<string, string[]> = {};
+    FLAGS.forEach(flag => {
+        try {
+            if (flag.kind === 'switch') {
+                values[flag.name] = solver.solve(`setting(${flag.name})`).next().isYes ? ['true'] : [];
+            } else {
+                const found: string[] = [];
+                const solutions = solver.solve(`setting(${flag.name}, Value)`);
+                while (solutions.hasNext()) {
+                    const solution = solutions.next();
+                    if (!solution.isYes) break;
+                    found.push(unquoted(solution.text('Value') ?? ''));
+                }
+                values[flag.name] = found;
+            }
+        } catch {
+            // a flag this version of arg2p does not know
+        }
+    });
+    values.graphBuildMode = [profileOf(solver)].filter(it => it !== '');
+    return values;
+}
+
+function unquoted(value: string): string {
+    const quoted = /^'(.*)'$/.exec(value);
+    return quoted ? quoted[1].replace(/''/g, "'") : value;
 }
 
 // An error of the API as an EngineError, where in the text it is when the text does not parse

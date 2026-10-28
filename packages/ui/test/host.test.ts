@@ -1,5 +1,7 @@
 import { assert, describe, it } from 'vitest';
-import { check, createHost, type Answer, type Request } from '../src/js/host.js';
+import * as api from '@tuprolog/arg2p';
+import { DEFAULT_FLAGS, FLAGS as SCHEMA, PROFILES } from '../src/flags/schema.js';
+import { check, createHost, settings, type Answer, type Request } from '../src/js/host.js';
 import { JsEngine, type Channel } from '../src/js/engine.js';
 
 const { deepEqual, equal } = assert;
@@ -113,6 +115,45 @@ describe('Host of the engine', function () {
     });
 });
 
+describe('Settings in effect', function () {
+    it('should give the flags of the profile, unless the flags or the theory state others', function () {
+        const aspic = settings(TWEETY, DEFAULT_FLAGS);
+        deepEqual(aspic.graphBuildMode, ['aspic_plus']);
+        deepEqual([...aspic.graphExtension].sort(), ['rebutRestriction', 'standardPref']);
+        deepEqual(aspic.autoTransposition, ['true']);
+        deepEqual(aspic.argumentLabellingMode, ['grounded']);
+
+        const abstract = settings('graphBuildMode(abstract).\na -> b.', DEFAULT_FLAGS);
+        deepEqual(abstract.graphBuildMode, ['abstract']);
+        deepEqual(abstract.graphExtension, []);
+        deepEqual(abstract.queryMode, []);
+        deepEqual(abstract.graphBuilder, ['abstractGraph']);
+
+        deepEqual(settings(TWEETY, `${DEFAULT_FLAGS}autoTransposition(off).\n`).autoTransposition, []);
+        deepEqual(settings('argumentLabellingMode(preferred).', DEFAULT_FLAGS).argumentLabellingMode, ['preferred']);
+        deepEqual(settings(TWEETY, 'graphBuildMode(aba).\n').graphBuildMode, ['aba']);
+    });
+
+    it('should read the flags alone when the theory does not parse, and none when they do not', function () {
+        deepEqual(settings('a :=> b', 'graphBuildMode(aba).\n').graphBuildMode, ['aba']);
+        deepEqual(settings(TWEETY, 'graphBuildMode(aba'), {});
+    });
+
+    it('should know the profiles and the values of the flags of the API', function () {
+        const values = (it: { values(): { value: string }[] }) => it.values().map(value => value.value).sort();
+        const options = (name: string) => SCHEMA.find(it => it.name === name)!.options!.map(it => it.value).sort();
+        deepEqual(PROFILES.map(it => it.name).sort(), values(api.Profile));
+        deepEqual(options('argumentLabellingMode'), values(api.Semantics));
+        deepEqual(options('statementLabellingMode'), values(api.StatementLabelling));
+        deepEqual(options('graphExtension'), values(api.GraphExtension));
+        deepEqual(options('orderingPrinciple'), values(api.OrderingPrinciple));
+        deepEqual(options('orderingComparator'), values(api.OrderingComparator));
+        deepEqual(options('graphLanguage'), values(api.GraphLanguage));
+        deepEqual(options('graphBuilder'), values(api.GraphBuilder));
+        deepEqual(options('conflictModel'), values(api.ConflictModel));
+    });
+});
+
 describe('Engine of the browser', function () {
     it('should run queries through its channel', async function () {
         const run = await engine().solve({ theory: TWEETY, query: 'buildLabelSets(In, Out, Und).', flags: FLAGS });
@@ -145,6 +186,10 @@ describe('Engine of the browser', function () {
             (it: unknown) => it as { stopped?: boolean },
         );
         equal(error?.stopped, true);
+    });
+
+    it('should give the settings in effect', async function () {
+        deepEqual((await engine().settings('graphBuildMode(abstract).', DEFAULT_FLAGS)).graphBuildMode, ['abstract']);
     });
 
     it('should check texts', async function () {

@@ -1,4 +1,5 @@
 import type { Engine, EngineError, GraphData, Run, SolutionData, SolveRequest, SyntaxProblem } from '../engine.js';
+import type { Settings } from '../flags/schema.js';
 import type { Answer, Request } from './host.js';
 
 /** What [JsEngine] runs the solver on: a Worker, or anything that answers as one (a host of the same thread, for tests) */
@@ -65,6 +66,13 @@ export class JsEngine implements Engine {
         );
     }
 
+    settings(theory: string, flags: string): Promise<Settings> {
+        const reqId = ++this.sequence;
+        return this.request({ type: 'settings', reqId, theory, flags }, `settings:${reqId}`).then(
+            answer => (answer as Extract<Answer, { type: 'settings' }>).settings,
+        );
+    }
+
     stop(): void {
         this.failAll({ name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true });
         this.restart();
@@ -98,6 +106,7 @@ export class JsEngine implements Engine {
         const key =
             answer.type === 'graph' ? `graph:${answer.reqId}`
             : answer.type === 'checked' ? `check:${answer.reqId}`
+            : answer.type === 'settings' ? `settings:${answer.reqId}`
             : answer.type === 'solution' ? `next:${answer.id}`
             : answer.type === 'started' ? `start:${answer.id}`
             : answer.type === 'failed' ? [`start:${answer.id}`, `next:${answer.id}`].find(it => this.pending.has(it))

@@ -10,3 +10,8 @@ export { declaredFramework, redrawn } from './formats/declarations.js';
 export { Arg2pGraph, type Stages } from './components/arg2p-graph.js';
 export { Arg2pFramework } from './components/arg2p-framework.js';
 export { Arg2pSolutions, listItems } from './components/arg2p-solutions.js';
+export { Arg2pEditor, rangeOf, type EditorKind } from './components/arg2p-editor.js';
+export { Arg2pFlags, type Source } from './components/arg2p-flags.js';
+export { FLAG_GROUPS, FLAGS, PROFILES, DEFAULTS, DEFAULT_FLAGS, DEFAULT_PROFILE, SEMANTICS, profileInfo, type Flag, type FlagGroup, type FlagOption, type ProfileInfo, type Settings } from './flags/schema.js';
+export { statedFlags, statedProfile, withValues, withNone, withSwitch, without } from './flags/text.js';
+export { arg2p, arg2pLanguage } from './editor/language.js';

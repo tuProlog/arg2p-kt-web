@@ -1,3 +1,5 @@
+import type { Settings } from './flags/schema.js';
+
 // The engine the components run on: the solver of the browser (see ./js), or one of the JVM (a language server, for
 // the extension of VS Code). Everything it gives is plain data, as it crosses a worker or a process.
 
@@ -89,6 +91,12 @@ export interface Engine {
     solve(request: SolveRequest, output?: (text: string) => void): Promise<Run>;
     /** Where [text], a theory (or flags) or a query, does not parse; null if it does */
     check(text: string, kind: 'theory' | 'query'): Promise<SyntaxProblem | null>;
+    /**
+     * The values of the flags in effect for [theory] solved with [flags]: those the theory states, or else those of
+     * the flags that differ from their default, or else those its profile presets (those of the flags alone when the
+     * theory does not parse)
+     */
+    settings(theory: string, flags: string): Promise<Settings>;
     /** Stops the evaluation going on: what it was waited for fails, as stopped */
     stop(): void;
 }

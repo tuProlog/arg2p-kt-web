@@ -126,6 +126,11 @@ export class Arg2pFramework extends LitElement {
         this.draw();
     }
 
+    protected override willUpdate(changed: PropertyValues): void {
+        // the graph of another theory: its labels no longer hold
+        if (changed.has('theory') && !changed.has('graph') && changed.get('theory') !== undefined) this.graph = null;
+    }
+
     protected override updated(changed: PropertyValues): void {
         if (changed.has('theory') || changed.has('graph')) this.draw();
         if (changed.has('readonly')) {

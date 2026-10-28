@@ -277,6 +277,16 @@ describe('<arg2p-framework>', function () {
         ok(editor.drawing!.getElementById('bee').nonempty());
     });
 
+    it('should forget the labels of a graph once the theory changes', async function () {
+        const { editor } = await framework();
+        editor.graph = ABSTRACT;
+        await editor.updateComplete;
+        editor.theory = `${THEORY}c.\n`;
+        await editor.updateComplete;
+        equal(editor.graph, null);
+        equal(editor.drawing!.getElementById('x').nonempty(), false);
+    });
+
     it('should draw a theory edited as text, the arguments kept where they were', async function () {
         const { editor } = await framework();
         const where = { ...editor.drawing!.getElementById('a').position() };
