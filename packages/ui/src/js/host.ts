@@ -1,6 +1,7 @@
 import { Arg2p, Flags, Value, type Graph, type Solutions } from '@tuprolog/arg2p';
 import { EMPTY_GRAPH, type EngineError, type GraphData, type SolutionData, type SyntaxProblem } from '../engine.js';
 import { FLAGS, type Settings } from '../flags/schema.js';
+import { unquote } from '../formats/atoms.js';
 
 // The solver's side of the engine of the browser (see JsEngine): it answers messages, posting its answers with `post`.
 // Kept apart from the worker, so that it runs (and is tested) anywhere.
@@ -217,7 +218,7 @@ export function settings(theory: string, flags: string): Settings {
                 while (solutions.hasNext()) {
                     const solution = solutions.next();
                     if (!solution.isYes) break;
-                    found.push(unquoted(solution.text('Value') ?? ''));
+                    found.push(unquote(solution.text('Value') ?? ''));
                 }
                 values[flag.name] = found;
             }
@@ -227,11 +228,6 @@ export function settings(theory: string, flags: string): Settings {
     });
     values.graphBuildMode = [profileOf(solver)].filter(it => it !== '');
     return values;
-}
-
-function unquoted(value: string): string {
-    const quoted = /^'(.*)'$/.exec(value);
-    return quoted ? quoted[1].replace(/''/g, "'") : value;
 }
 
 // An error of the API as an EngineError, where in the text it is when the text does not parse

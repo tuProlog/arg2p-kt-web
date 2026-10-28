@@ -1,4 +1,7 @@
 import type { GraphData } from '../engine.js';
+import { nameOf } from '../graph/drawing.js';
+import { isAtom } from './atoms.js';
+import { redrawn } from './declarations.js';
 
 // Abstract argumentation frameworks in the formats of the ICCMA competitions, to exchange them with other tools:
 //
@@ -19,24 +22,16 @@ export interface ReadFramework extends Framework {
     readonly renamed: readonly { readonly from: string; readonly to: string }[];
 }
 
-// Names have to be Prolog atoms: a lowercase letter, then letters, digits or underscores
-const ATOM = /^[a-z][a-zA-Z0-9_]*$/;
-
-/** The theory of [framework], in the profile abstract */
+/** The theory of [framework], in the profile abstract: a new theory declaring it */
 export function toTheory(framework: Framework): string {
-    return [
-        'graphBuildMode(abstract).',
-        '',
-        ...framework.arguments.map(it => `${it}.`),
-        ...framework.attacks.map(it => `${it.from} -> ${it.to}.`),
-    ].join('\n') + '\n';
+    return redrawn('', framework);
 }
 
-/** The framework of [graph], an abstract one: its arguments by name */
+/** The framework of [graph], an abstract one: its arguments by the names the theory gives them */
 export function frameworkOf(graph: GraphData): Framework {
-    const names = new Map(graph.arguments.map(it => [it.id, it.conclusion]));
+    const names = new Map(graph.arguments.map(it => [it.id, nameOf(it, true)]));
     return {
-        arguments: graph.arguments.map(it => it.conclusion),
+        arguments: [...names.values()],
         attacks: graph.attacks
             .filter(it => names.has(it.from) && names.has(it.to))
             .map(it => ({ from: names.get(it.from)!, to: names.get(it.to)! })),
@@ -111,11 +106,11 @@ function parseIccma23(lines: string[]): Framework {
 // Every name made an atom, the same way everywhere it appears, and the arguments only mentioned by attacks added
 function named(framework: Framework): ReadFramework {
     const names = new Map<string, string>();
-    const used = new Set(framework.arguments.filter(it => ATOM.test(it)));
+    const used = new Set(framework.arguments.filter(isAtom));
     const atom = (raw: string): string => {
         const known = names.get(raw);
         if (known !== undefined) return known;
-        let name = ATOM.test(raw) ? raw : candidate(raw);
+        let name = isAtom(raw) ? raw : candidate(raw);
         if (name !== raw) {
             const base = name;
             for (let n = 2; used.has(name); n++) name = `${base}_${n}`;

@@ -1,51 +1,50 @@
-import { css } from 'lit';
+import { css, unsafeCSS } from 'lit';
 
 // The look of the components, as custom properties a page sets (the dark theme of the playground, the theme of VS Code
 // in a webview): each falls back to the light theme. The colours of the labels (in, out, und) stay the same in every
 // theme: they carry meaning.
-export const tokens = css`
-    :host {
-        --_surface: var(--arg2p-surface, #ffffff);
-        --_surface-2: var(--arg2p-surface-2, #f7f7f8);
-        --_hover: var(--arg2p-hover, #f4fafa);
-        --_border: var(--arg2p-border, #e3e3e3);
-        --_text: var(--arg2p-text, #212529);
-        --_muted: var(--arg2p-muted, #777777);
-        --_accent: var(--arg2p-accent, #008080);
-        --_in: var(--arg2p-in, #008080);
-        --_out: var(--arg2p-out, #800000);
-        --_und: var(--arg2p-und, #808080);
-        --_unlabelled: var(--arg2p-unlabelled, #2b7ce9);
-        --_support: var(--arg2p-support, #9a9a9a);
-        --_no: var(--arg2p-no, #c9a400);
-        --_error: var(--arg2p-error, #b00020);
-        --_atom: var(--arg2p-atom, #800000);
-        --_functor: var(--arg2p-functor, #6a1b9a);
-        --_variable: var(--arg2p-variable, var(--_text));
-        --_comment: var(--arg2p-comment, #808080);
-        --_font: var(--arg2p-font, system-ui, sans-serif);
-        --_mono: var(--arg2p-mono, ui-monospace, monospace);
-        color: var(--_text);
-        font-family: var(--_font);
-    }
-`;
 
-const DEFAULTS: Record<string, string> = {
+// The tokens, by name (--arg2p-<name> for the page, --_<name> in the components), and their values in the light theme
+const LIGHT = {
+    surface: '#ffffff',
+    'surface-2': '#f7f7f8',
+    hover: '#f4fafa',
+    border: '#e3e3e3',
+    text: '#212529',
+    muted: '#777777',
+    accent: '#008080',
     in: '#008080',
     out: '#800000',
     und: '#808080',
     unlabelled: '#2b7ce9',
     support: '#9a9a9a',
-};
+    no: '#c9a400',
+    error: '#b00020',
+    atom: '#800000',
+    functor: '#6a1b9a',
+    variable: 'var(--_text)',
+    comment: '#808080',
+    font: 'system-ui, sans-serif',
+    mono: 'ui-monospace, monospace',
+} as const;
+
+export type Token = keyof typeof LIGHT;
+
+export const tokens = css`
+    :host {
+        ${unsafeCSS(Object.entries(LIGHT).map(([name, value]) => `--_${name}: var(--arg2p-${name}, ${value});`).join('\n'))}
+        color: var(--_text);
+        font-family: var(--_font);
+    }
+`;
 
 /** The colour of [label] (in, out, und; any other is unlabelled) as [element] is styled, for what draws on a canvas */
 export function labelColor(element: Element, label: string | null | undefined): string {
-    const key = label === 'in' || label === 'out' || label === 'und' ? label : 'unlabelled';
-    return cssColor(element, key);
+    return cssColor(element, label === 'in' || label === 'out' || label === 'und' ? label : 'unlabelled');
 }
 
-/** The colour [name] of the tokens as [element] is styled (in, out, und, unlabelled, support) */
-export function cssColor(element: Element, name: string): string {
-    const value = getComputedStyle(element).getPropertyValue(`--arg2p-${name}`).trim();
-    return value !== '' ? value : DEFAULTS[name] ?? '#000000';
+/** The value of the token [name] as [element], a component, is styled: that of the light theme where none is computed */
+export function cssColor(element: Element, name: Token): string {
+    const value = getComputedStyle(element).getPropertyValue(`--_${name}`).trim();
+    return value !== '' && !value.startsWith('var(') ? value : LIGHT[name];
 }
