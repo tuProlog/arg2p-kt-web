@@ -62,9 +62,13 @@ export function png(cy: Core, background: string): string {
     return cy.png({ full: true, bg: background, scale: 2, output: 'base64uri' });
 }
 
+// What a pointer does on the drawing: cytoscape reads where the drawing is on the screen as it handles it
+const POINTER_EVENTS = ['mousedown', 'mousemove', 'touchstart', 'wheel'] as const;
+
 /**
  * Keeps [cy] the size of [container] (a page may hide it, or lay it out again), fitting the drawing once it is shown
- * after being hidden. Gives what stops it.
+ * after being hidden, and where it is on the screen (a page scrolled moves it: cytoscape keeps where it was, and a tap
+ * would miss what it is on). Gives what stops it.
  */
 export function followSize(cy: Core, container: HTMLElement): () => void {
     if (typeof ResizeObserver === 'undefined' || cy.container() === null) return () => {};
@@ -76,5 +80,13 @@ export function followSize(cy: Core, container: HTMLElement): () => void {
         hidden = nowHidden;
     });
     observer.observe(container);
-    return () => observer.disconnect();
+    // before cytoscape handles the event: listened to while it goes down to the drawing, above its own listeners
+    const above = container.parentElement ?? container;
+    const renderer = (cy as unknown as { renderer(): { invalidateContainerClientCoordsCache?: () => void } }).renderer();
+    const moved = () => (renderer.invalidateContainerClientCoordsCache === undefined ? cy.resize() : renderer.invalidateContainerClientCoordsCache());
+    POINTER_EVENTS.forEach(it => above.addEventListener(it, moved, { capture: true, passive: true }));
+    return () => {
+        observer.disconnect();
+        POINTER_EVENTS.forEach(it => above.removeEventListener(it, moved, { capture: true }));
+    };
 }
