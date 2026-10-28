@@ -145,7 +145,8 @@ export class Arg2pEditor extends LitElement {
                 '&': { height: '100%', backgroundColor: 'var(--_surface)', color: 'var(--_text)' },
                 '&.cm-focused': { outline: 'none' },
                 '.cm-scroller': { fontFamily: 'var(--_mono)', lineHeight: '1.5' },
-                '.cm-content': { caretColor: 'var(--_text)' },
+                // the text as typed: no ligature turns => into an arrow
+                '.cm-content': { caretColor: 'var(--_text)', fontVariantLigatures: 'none' },
                 '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--_text)' },
                 '.cm-gutters': { backgroundColor: 'var(--_surface-2)', color: 'var(--_muted)', border: 'none' },
                 '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {

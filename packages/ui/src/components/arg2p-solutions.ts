@@ -363,12 +363,18 @@ function bindings(list: SolutionData['bindings']) {
                     <dd>
                         ${items === null ? value
                         : items.length === 0 ? html`<span class="empty">[ ]</span>`
-                        : items.map(item => html`<span class="chip ${label}">${item}</span>`)}
+                        : items.map(item => html`<span class="chip ${label}">${single(item)}</span>`)}
                     </dd>
                 `;
             })}
         </dl>
     `;
+}
+
+// A statement of a set of labelled statements is a list of one term, `[flies(tweety)]`: shown as the term
+function single(item: string): string {
+    const items = listItems(item);
+    return items !== null && items.length === 1 ? items[0] : item;
 }
 
 /** The top level elements of a Prolog list term, or null for any other term (a list with a tail, `[a | T]`, too) */

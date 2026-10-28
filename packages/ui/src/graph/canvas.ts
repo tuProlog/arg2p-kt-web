@@ -61,3 +61,20 @@ export function png(cy: Core, background: string): string {
     if (cy.container() === null) return '';
     return cy.png({ full: true, bg: background, scale: 2, output: 'base64uri' });
 }
+
+/**
+ * Keeps [cy] the size of [container] (a page may hide it, or lay it out again), fitting the drawing once it is shown
+ * after being hidden. Gives what stops it.
+ */
+export function followSize(cy: Core, container: HTMLElement): () => void {
+    if (typeof ResizeObserver === 'undefined' || cy.container() === null) return () => {};
+    let hidden = container.clientWidth === 0 || container.clientHeight === 0;
+    const observer = new ResizeObserver(() => {
+        const nowHidden = container.clientWidth === 0 || container.clientHeight === 0;
+        cy.resize();
+        if (hidden && !nowHidden && cy.elements().nonempty()) fit(cy);
+        hidden = nowHidden;
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+}

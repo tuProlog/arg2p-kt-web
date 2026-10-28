@@ -141,7 +141,7 @@ describe('<arg2p-solutions>', function () {
         const solutions = await element<Arg2pSolutions>('arg2p-solutions');
         const shown: SolutionData[] = [];
         solutions.addEventListener('arg2p-solution', event => shown.push((event as CustomEvent).detail.solution));
-        const yes = solution('yes', [{ name: 'In', value: '[a, b]' }]);
+        const yes = solution('yes', [{ name: 'In', value: '[[a], [b, c]]' }]);
         const queries = run([yes, solution('yes'), solution('no')]);
         await solutions.start(queries);
         await solutions.updateComplete;
@@ -149,7 +149,7 @@ describe('<arg2p-solutions>', function () {
         equal(shown.length, 1);
         equal(solutions.trivial, false);
         const chips = [...solutions.shadowRoot!.querySelectorAll('.chip.in')].map(it => it.textContent);
-        deepEqual(chips, ['a', 'b']);
+        deepEqual(chips, ['a', '[b, c]']);
 
         await solutions.next();
         await solutions.next();

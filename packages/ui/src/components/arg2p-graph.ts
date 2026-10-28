@@ -1,7 +1,7 @@
 import type { Core, EventObject, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Run, type SolutionData } from '../engine.js';
-import { NODE_FONT, drawing, fit, nodeSize, png } from '../graph/canvas.js';
+import { NODE_FONT, drawing, fit, followSize, nodeSize, png } from '../graph/canvas.js';
 import { attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
 import { levelsOf, supportsOf } from '../graph/levels.js';
@@ -101,6 +101,7 @@ export class Arg2pGraph extends LitElement {
 
     // One drawing per element: moving between the stages updates it in place, so that arguments keep their place
     private cy: Core | null = null;
+    private unfollow = () => {};
 
     /** Shows the graph of [solution], its stages browsable through [run] */
     showSolution(solution: SolutionData, run: Pick<Run, 'graphAt'> | null = null): void {
@@ -117,6 +118,13 @@ export class Arg2pGraph extends LitElement {
     png(): string {
         if (this.cy === null) return '';
         return png(this.cy, getComputedStyle(this).getPropertyValue('--_surface').trim() || '#ffffff');
+    }
+
+    /** Fits the drawing to the element */
+    fit(): void {
+        if (this.cy === null) return;
+        this.cy.resize();
+        fit(this.cy);
     }
 
     /** Draws the graph again, in the colours the page sets now (after a change of theme) */
@@ -153,6 +161,7 @@ export class Arg2pGraph extends LitElement {
         // the popup follows its node while the graph is dragged or zoomed
         cy.on('viewport position', () => this.placePopup());
         this.cy = cy;
+        this.unfollow = followSize(cy, this.renderRoot.querySelector<HTMLElement>('.canvas')!);
     }
 
     protected override updated(changed: PropertyValues): void {
@@ -162,6 +171,7 @@ export class Arg2pGraph extends LitElement {
 
     override disconnectedCallback(): void {
         super.disconnectedCallback();
+        this.unfollow();
         this.cy?.destroy();
         this.cy = null;
     }

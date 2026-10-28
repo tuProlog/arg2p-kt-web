@@ -3,7 +3,7 @@ import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
 import type { Framework } from '../formats/frameworks.js';
-import { NODE_FONT, drawing, fit, nodeSize, png } from '../graph/canvas.js';
+import { NODE_FONT, drawing, fit, followSize, nodeSize, png } from '../graph/canvas.js';
 import { labelColor, tokens } from '../theme.js';
 
 const NAME = /^[a-z][a-zA-Z0-9_]*$/;
@@ -84,6 +84,7 @@ export class Arg2pFramework extends LitElement {
     private source: string | null = null;
 
     private cy: Core | null = null;
+    private unfollow = () => {};
     // the framework of [theory], as drawn
     private drawn: Framework = { arguments: [], attacks: [] };
 
@@ -123,6 +124,7 @@ export class Arg2pFramework extends LitElement {
         });
         cy.on('viewport position', () => this.placeRename());
         this.cy = cy;
+        this.unfollow = followSize(cy, this.renderRoot.querySelector<HTMLElement>('.canvas')!);
         this.draw();
     }
 
@@ -147,6 +149,7 @@ export class Arg2pFramework extends LitElement {
 
     override disconnectedCallback(): void {
         super.disconnectedCallback();
+        this.unfollow();
         this.cy?.destroy();
         this.cy = null;
     }
