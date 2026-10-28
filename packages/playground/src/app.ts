@@ -33,6 +33,8 @@ type Panel = 'results' | 'flags' | 'console' | 'federation';
 
 const DOCS = 'https://tuprolog.github.io/arg2p-kt/';
 const PROJECT = 'https://github.com/tuProlog/arg2p-kt';
+const UNSAVED =
+    'The browser did not keep the last changes (its storage is full, or disabled): they stay in this page, and are saved again at the next change. Forget closed theories, or close some, to make room.';
 
 /**
  * The playground: the theories worked on, in tabs kept in the browser; the theory, its query and its flags, edited
@@ -61,6 +63,7 @@ export class Arg2pPlayground extends LitElement {
             this.workspace = workspace;
             this.active = active;
         },
+        unsaved: () => (this.notice = { text: UNSAVED, error: true }),
     });
 
     private workspace: Workspace = this.session.current;

@@ -10,8 +10,13 @@ import { DEFAULT_FLAGS, toTheory, type Framework } from '@tuprolog/arg2p-ui/data
 // Several pages may share it (browser tabs or windows): each change is made on the workspace as stored just before
 // (see session.ts), so documents get ids no other page can pick too, and `active` is only the document the last page
 // worked on, for the next page to start from.
+//
+// Each version is kept under a key of its own: a page of an older version still open writes its own key, and never
+// overwrites what a newer one saved. The key of version 1 is read only to start from what it kept.
 
-export const KEY = 'arg2p.workspace';
+export const KEY = 'arg2p.workspace.2';
+/** Where version 1 kept the workspace (and the first pages of version 2, before it had a key of its own) */
+export const LEGACY_KEY = 'arg2p.workspace';
 const VERSION = 2;
 /** How many closed documents are kept, newest first */
 export const MAX_CLOSED = 30;
@@ -56,15 +61,29 @@ export function emptyWorkspace(): Workspace {
     return { version: VERSION, active: null, tabs: [], closed: [] };
 }
 
-/** The workspace [storage] keeps (one of version 1 brought up to date), or null when there is none it can read */
+/**
+ * The workspace [storage] keeps, or else the one under the key of version 1 brought up to date; null when there is
+ * none it can read
+ */
 export function load(storage: Storage): Workspace | null {
     try {
-        const data = JSON.parse(storage.getItem(KEY) ?? 'null') as { version?: number; tabs?: unknown; closed?: unknown } | null;
+        const current = storage.getItem(KEY);
+        return read(current ?? storage.getItem(LEGACY_KEY));
+    } catch {
+        // no storage: start afresh
+        return null;
+    }
+}
+
+// A workspace as stored: of this version, or of version 1 brought up to date
+function read(text: string | null): Workspace | null {
+    try {
+        const data = JSON.parse(text ?? 'null') as { version?: number; tabs?: unknown; closed?: unknown } | null;
         if (data === null || !Array.isArray(data.tabs) || !Array.isArray(data.closed)) return null;
         if (data.version === VERSION) return data as Workspace;
         if (data.version === 1) return migrated(data as unknown as LegacyWorkspace);
     } catch {
-        // unreadable, or no storage: start afresh
+        // unreadable: start afresh
     }
     return null;
 }
