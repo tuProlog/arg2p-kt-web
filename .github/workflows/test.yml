@@ -34,10 +34,41 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: packages/playground/dist
+  # @tuprolog/arg2p-ui on npm, from master, when its version is not published yet (with its provenance): the token of
+  # npm is the secret NPM_TOKEN, unless npmjs.com trusts this workflow as its publisher
+  publish-ui:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+    if: github.ref_name == 'master'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Publish the components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p "require('./packages/ui/package.json').version")
+          if npm view "@tuprolog/arg2p-ui@$version" version > /dev/null 2>&1; then
+            echo "@tuprolog/arg2p-ui $version is on npm already"
+            exit 0
+          fi
+          npm install
+          npm run build -w @tuprolog/arg2p-ui
+          npm publish -w @tuprolog/arg2p-ui --access public --provenance
   success:
     runs-on: ubuntu-26.04
     needs:
       - test
+      - publish-ui
     if: >-
       always() && (
         contains(join(needs.*.result, ','), 'failure')
