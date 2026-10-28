@@ -1,7 +1,7 @@
 import '../src/index.js';
 import { DEFAULT_FLAGS } from '../src/flags/schema.js';
 import { JsEngine } from '../src/js/index.js';
-import type { EngineError, Run, SolutionData } from '../src/engine.js';
+import type { SyntaxProblem } from '../src/engine.js';
 
 // A page to try the components on while they are written (npm run dev): not published
 
@@ -13,57 +13,37 @@ const EXAMPLES: Record<string, string> = {
 
 const $ = <K extends keyof HTMLElementTagNameMap>(selector: string) => document.querySelector(selector) as HTMLElementTagNameMap[K];
 const theory = $<'arg2p-editor'>('#theory');
-const query = $<'arg2p-editor'>('#query');
 const example = $<'select'>('#example');
-const flags = $<'arg2p-flags'>('arg2p-flags');
-const solutions = $<'arg2p-solutions'>('arg2p-solutions');
-const graph = $<'arg2p-graph'>('arg2p-graph');
-const framework = $<'arg2p-framework'>('arg2p-framework');
+const tabbed = $<'input'>('#tabbed');
+const solver = $<'arg2p-solver'>('arg2p-solver');
 
 // from the sources: the worker of the package is found next to the engine once built
 const engine = new JsEngine(() => new Worker(new URL('../src/js/worker.ts', import.meta.url), { type: 'module' }) as never);
 engine.start();
 theory.engine = engine;
-query.engine = engine;
-flags.engine = engine;
-flags.flags = DEFAULT_FLAGS;
-query.value = 'buildLabelSets(In, Out, Und)';
+solver.engine = engine;
+solver.flags = DEFAULT_FLAGS;
+solver.query = 'buildLabelSets(In, Out, Und)';
 
 const setTheory = (text: string) => {
     theory.value = text;
-    framework.theory = text;
-    flags.theory = text;
+    solver.theory = text;
+    solver.clear();
 };
 Object.keys(EXAMPLES).forEach(name => example.add(new Option(name, name)));
 example.addEventListener('change', () => setTheory(EXAMPLES[example.value]));
 setTheory(EXAMPLES.tweety);
 
-theory.addEventListener('arg2p-change', event => {
-    framework.theory = (event as CustomEvent<{ value: string }>).detail.value;
-    flags.theory = framework.theory;
+// the theory edited beside the solver, or in its tab
+tabbed.addEventListener('change', () => {
+    solver.theoryTab = tabbed.checked;
+    document.body.classList.toggle('tabbed', tabbed.checked);
 });
-framework.addEventListener('arg2p-theory-change', event => {
-    theory.value = (event as CustomEvent<{ theory: string }>).detail.theory;
-    flags.theory = theory.value;
+theory.addEventListener('arg2p-change', event => (solver.theory = (event as CustomEvent<{ value: string }>).detail.value));
+solver.addEventListener('arg2p-theory-change', event => (theory.value = (event as CustomEvent<{ theory: string }>).detail.theory));
+solver.addEventListener('arg2p-theory-error', event => theory.report((event as CustomEvent<{ problem: SyntaxProblem }>).detail.problem));
+solver.addEventListener('arg2p-run', event => console.log('run', (event as CustomEvent).detail));
+$<'button'>('#dark').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    solver.restyle();
 });
-solutions.addEventListener('arg2p-solution', event => {
-    const { solution, run } = (event as CustomEvent<{ solution: SolutionData; run: Run }>).detail;
-    graph.solution = { solution, run };
-    framework.graph = solution.graph;
-});
-solutions.addEventListener('arg2p-error-select', event => {
-    const { syntax } = (event as CustomEvent<{ error: EngineError }>).detail.error;
-    if (syntax?.where === 'theory') theory.report(syntax);
-    else if (syntax?.where === 'query') query.report(syntax);
-});
-
-const solve = () => {
-    graph.solution = null;
-    engine.solve({ theory: theory.value, query: query.value, flags: flags.flags }, text => console.log(text)).then(
-        run => solutions.start(run),
-        (error: EngineError) => solutions.fail(error),
-    );
-};
-query.addEventListener('arg2p-submit', solve);
-document.querySelector('#solve')!.addEventListener('click', solve);
-document.querySelector('#stop')!.addEventListener('click', () => engine.stop());

@@ -1,0 +1,291 @@
+// @vitest-environment happy-dom
+import { afterEach, assert, describe, it } from 'vitest';
+import '../src/index.js';
+import type { Arg2pEditor } from '../src/components/arg2p-editor.js';
+import type { Arg2pFramework } from '../src/components/arg2p-framework.js';
+import type { Arg2pGraph } from '../src/components/arg2p-graph.js';
+import type { Arg2pSolver } from '../src/components/arg2p-solver.js';
+import type { Engine, EngineError, GraphData, Run, SolutionData, SolveRequest, SyntaxProblem } from '../src/engine.js';
+import { drawingOf } from '../src/graph/canvas.js';
+
+const { deepEqual, equal } = assert;
+const ok: (value: unknown, message?: string) => void = assert.ok;
+
+// The simulated DOM looks for the element focused in another shadow tree past the document, and fails: it is none of
+// this shadow tree
+const activeElement = Object.getOwnPropertyDescriptor(ShadowRoot.prototype, 'activeElement')!;
+Object.defineProperty(ShadowRoot.prototype, 'activeElement', {
+    get() {
+        try {
+            return activeElement.get!.call(this);
+        } catch {
+            return null;
+        }
+    },
+});
+
+const GRAPH: GraphData = {
+    profile: 'aspic_plus',
+    arguments: [{ id: 'A0', descriptor: 'A0 : f1 : a', conclusion: 'a', topRule: 'none', label: 'in', supports: [] }],
+    attacks: [],
+};
+
+const ABSTRACT: GraphData = {
+    profile: 'abstract',
+    arguments: ['a', 'b'].map((name, i) => ({ id: `A${i}`, descriptor: '', conclusion: name, topRule: name, label: i === 0 ? 'in' : 'out', supports: [] })),
+    attacks: [{ from: 'A0', to: 'A1', type: 'abstract', on: 'A1' }],
+};
+
+const STOPPED: EngineError = { name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true };
+
+function yes(graph = GRAPH): SolutionData {
+    return { result: 'yes', query: 'q', bindings: [{ name: 'X', value: 'a' }], error: null, graph, branch: 0 };
+}
+
+/**
+ * An engine whose runs give [solutions], or fail with [failure]; held, what it answers waits to be let go, and
+ * stopping fails what waits
+ */
+class Fake implements Engine {
+    readonly requests: SolveRequest[] = [];
+    stops = 0;
+    private readonly waiting: { go(): void; fail(error: EngineError): void }[] = [];
+
+    constructor(
+        private readonly solutions: SolutionData[],
+        private readonly failure: EngineError | null = null,
+        public hold = false,
+    ) {}
+
+    solve(request: SolveRequest, output: (text: string) => void = () => {}): Promise<Run> {
+        this.requests.push(request);
+        output('printed');
+        if (this.failure !== null) return Promise.reject(this.failure);
+        let next = 0;
+        const run: Run = {
+            query: request.query,
+            hasNext: () => next < this.solutions.length,
+            next: () => this.answer(this.solutions[next++]),
+            graphAt: () => Promise.resolve(GRAPH),
+        };
+        return this.answer(run);
+    }
+
+    check(): Promise<SyntaxProblem | null> {
+        return Promise.resolve(null);
+    }
+
+    settings(): Promise<Record<string, string[]>> {
+        return Promise.resolve({});
+    }
+
+    stop(): void {
+        this.stops++;
+        this.waiting.splice(0).forEach(it => it.fail(STOPPED));
+    }
+
+    /** Lets go what waits */
+    go(): void {
+        this.waiting.splice(0).forEach(it => it.go());
+    }
+
+    private answer<T>(value: T): Promise<T> {
+        if (!this.hold) return Promise.resolve(value);
+        return new Promise((resolve, reject) => this.waiting.push({ go: () => resolve(value), fail: reject }));
+    }
+}
+
+async function solver(engine: Engine, setup: (it: Arg2pSolver) => void = () => {}) {
+    const element = document.createElement('arg2p-solver') as Arg2pSolver;
+    element.engine = engine;
+    element.theory = 'f1 :=> a.';
+    element.query = 'buildLabelSets(In, Out, Und)';
+    element.flags = 'queryMode.';
+    setup(element);
+    document.body.appendChild(element);
+    await element.updateComplete;
+    const events: { type: string; detail: any }[] = [];
+    for (const type of ['arg2p-run', 'arg2p-busy', 'arg2p-error', 'arg2p-theory-error', 'arg2p-query-change', 'arg2p-flags-change', 'arg2p-theory-change', 'arg2p-change']) {
+        element.addEventListener(type, event => events.push({ type, detail: (event as CustomEvent).detail }));
+    }
+    const root = element.shadowRoot!;
+    return { element, events, root, find: <T extends Element>(selector: string) => root.querySelector<T>(selector)! };
+}
+
+const settled = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
+
+afterEach(() => {
+    document.body.replaceChildren();
+});
+
+describe('<arg2p-solver>', function () {
+    it('should solve the query, showing its solutions, the graph of the one shown, and what it printed', async function () {
+        const engine = new Fake([yes()]);
+        const { element, events, find } = await solver(engine);
+        await element.run();
+        await element.updateComplete;
+        deepEqual(engine.requests, [{ theory: 'f1 :=> a.', query: 'buildLabelSets(In, Out, Und)', flags: 'queryMode.' }]);
+        deepEqual(events.find(it => it.type === 'arg2p-run')?.detail, engine.requests[0]);
+        ok(find('arg2p-solutions').shadowRoot!.textContent!.includes('Solution 1'));
+        equal(find<Arg2pGraph>('arg2p-graph').solution?.solution.result, 'yes');
+        deepEqual(drawingOf(find('arg2p-graph'))!.nodes().map(it => it.id()), ['A0']);
+        ok(find('.tabs').textContent!.includes('Console •'));
+        equal(find('.console pre').textContent, 'printed');
+        deepEqual(
+            events.filter(it => it.type === 'arg2p-busy').map(it => it.detail.busy),
+            [true, false],
+        );
+        equal(element.busy, false);
+    });
+
+    it('should be busy until the first solution, and stop when asked', async function () {
+        const engine = new Fake([yes()], null, true);
+        const { element, events } = await solver(engine);
+        const running = element.run();
+        await settled();
+        await element.updateComplete;
+        ok(element.busy);
+        ok(element.hasAttribute('busy'));
+        element.shadowRoot!.querySelector<HTMLButtonElement>('.stop')!.click();
+        equal(engine.stops, 1);
+        await running;
+        await element.updateComplete;
+        equal(element.busy, false);
+        equal(events.filter(it => it.type === 'arg2p-error').length, 1);
+        // a run stopped as it started shows why
+        ok(element.shadowRoot!.querySelector('arg2p-solutions')!.shadowRoot!.textContent!.includes('Stopped'));
+    });
+
+    it('should tell a solution stopped, and be busy no more', async function () {
+        const engine = new Fake([yes(), yes()], null, false);
+        const { element, events, find } = await solver(engine);
+        await element.run();
+        engine.hold = true;
+        find<HTMLElement>('arg2p-solutions').shadowRoot!.querySelector<HTMLButtonElement>('.next')!.click();
+        await element.updateComplete;
+        ok(element.busy);
+        element.stop();
+        await settled();
+        await element.updateComplete;
+        equal(element.busy, false);
+        ok(find('.notice').textContent!.includes('Stopped before the next solution'));
+        deepEqual(events.filter(it => it.type === 'arg2p-error').map(it => it.detail.error), [STOPPED]);
+    });
+
+    it('should let go a run cleared while it runs: busy no more, and stopped', async function () {
+        const engine = new Fake([yes()], null, true);
+        const { element, find } = await solver(engine);
+        const running = element.run();
+        await settled();
+        ok(element.busy);
+        element.clear();
+        equal(element.busy, false);
+        equal(engine.stops, 1);
+        await running;
+        await element.updateComplete;
+        equal(element.busy, false);
+        equal(find<HTMLElement>('arg2p-solutions').shadowRoot!.querySelector('.solution'), null);
+        ok(find('.run'));
+        // and one cleared while it computes a solution
+        const next = new Fake([yes(), yes()]);
+        element.engine = next;
+        await element.run();
+        next.hold = true;
+        find<HTMLElement>('arg2p-solutions').shadowRoot!.querySelector<HTMLButtonElement>('.next')!.click();
+        ok(element.busy);
+        element.clear();
+        equal(next.stops, 1);
+        await settled();
+        await element.updateComplete;
+        equal(element.busy, false);
+        equal(element.shadowRoot!.querySelector('.notice'), null);
+    });
+
+    it('should leave the engine be when it is cleared with nothing running', async function () {
+        const engine = new Fake([yes()]);
+        const { element } = await solver(engine);
+        await element.run();
+        element.clear();
+        equal(engine.stops, 0);
+    });
+
+    it('should reveal where the query does not parse', async function () {
+        const syntax = { line: 1, column: 6, length: 1, message: "Unexpected token ')'", where: 'query' as const };
+        const { element, events, find } = await solver(new Fake([], { name: 'Query error', message: 'm', syntax }));
+        await element.run();
+        await element.updateComplete;
+        const query = find<Arg2pEditor>('#query');
+        await query.updateComplete;
+        ok(query.shadowRoot!.querySelector('.problem')!.textContent!.includes("Unexpected token ')'"));
+        equal(events.find(it => it.type === 'arg2p-error')?.detail.error.syntax, syntax);
+    });
+
+    it('should reveal where the flags do not parse, in the flags as text', async function () {
+        const syntax = { line: 1, column: 1, length: 1, message: 'Unexpected end of file', where: 'flags' as const };
+        const { element, find } = await solver(new Fake([], { name: 'Flags error', message: 'm', syntax }));
+        await element.run();
+        await element.updateComplete;
+        await element.updateComplete;
+        equal(find<HTMLElement>('.panel.flags').hidden, false);
+        ok(find<HTMLDetailsElement>('.flags-text').open);
+        ok(find<Arg2pEditor>('#flags').shadowRoot!.querySelector('.problem')!.textContent!.includes('Unexpected end of file'));
+    });
+
+    it('should reveal where the theory does not parse in its tab, or else tell the page', async function () {
+        const syntax = { line: 1, column: 8, length: 1, message: 'Unexpected end of file', where: 'theory' as const };
+        const failure = { name: 'Theory error', message: 'm', syntax };
+        const without = await solver(new Fake([], failure));
+        await without.element.run();
+        deepEqual(without.events.find(it => it.type === 'arg2p-theory-error')?.detail, { problem: syntax });
+        equal(without.root.querySelector('#theory'), null);
+
+        const tabbed = await solver(new Fake([], failure), it => (it.theoryTab = true));
+        await tabbed.element.run();
+        await tabbed.element.updateComplete;
+        await tabbed.element.updateComplete;
+        equal(tabbed.find<HTMLElement>('.panel.theory').hidden, false);
+        ok(tabbed.find<Arg2pEditor>('#theory').shadowRoot!.querySelector('.problem')!.textContent!.includes('Unexpected end of file'));
+        equal(tabbed.events.some(it => it.type === 'arg2p-theory-error'), false);
+    });
+
+    it('should draw an abstract framework, labelled by the solution, and tell the theory its drawing writes', async function () {
+        const theory = 'graphBuildMode(abstract).\na.\nb.\na -> b.\n';
+        const { element, events, find } = await solver(new Fake([yes(ABSTRACT)]), it => (it.theory = theory));
+        ok(find<HTMLElement>('arg2p-graph').hidden);
+        equal(find<HTMLElement>('arg2p-framework').hidden, false);
+        ok(find('.profile').textContent!.includes('Abstract framework'));
+        await element.run();
+        await element.updateComplete;
+        const drawing = find<Arg2pFramework>('arg2p-framework');
+        await drawing.updateComplete;
+        equal(drawingOf(drawing)!.getElementById('b').data('tone'), 'out');
+        // drawn: an argument deleted
+        drawingOf(drawing)!.getElementById('b').select();
+        await drawing.updateComplete;
+        [...drawing.shadowRoot!.querySelectorAll<HTMLButtonElement>('.bar button')].find(it => it.textContent === 'Delete')!.click();
+        const told = events.filter(it => it.type === 'arg2p-theory-change');
+        deepEqual(told.map(it => it.detail), [{ theory: 'graphBuildMode(abstract).\na.\n' }]);
+        equal(element.theory, 'graphBuildMode(abstract).\na.\n');
+    });
+
+    it('should tell the query and the flags as they are edited, once', async function () {
+        const { events, find } = await solver(new Fake([]));
+        find<Arg2pEditor>('#query').dispatchEvent(new CustomEvent('arg2p-change', { detail: { value: 'q(X)' }, bubbles: true, composed: true }));
+        find('arg2p-flags').dispatchEvent(new CustomEvent('arg2p-flags-change', { detail: { flags: 'debug.' }, bubbles: true, composed: true }));
+        deepEqual(
+            events.map(it => it.type),
+            ['arg2p-query-change', 'arg2p-flags-change'],
+        );
+        deepEqual(events[0].detail, { query: 'q(X)' });
+        deepEqual(events[1].detail, { flags: 'debug.' });
+    });
+
+    it('should share the places of the arguments between the graph and the drawing', async function () {
+        const theory = 'graphBuildMode(abstract).\na.\nb.\na -> b.\n';
+        const { element, find } = await solver(new Fake([yes(ABSTRACT)]), it => (it.theory = theory));
+        const drawing = find<Arg2pFramework>('arg2p-framework');
+        drawingOf(drawing)!.getElementById('a').position({ x: 7, y: 9 }).emit('dragfree');
+        await element.updateComplete;
+        deepEqual(find<Arg2pGraph>('arg2p-graph').positions!.a, { x: 7, y: 9 });
+    });
+});
