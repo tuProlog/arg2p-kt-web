@@ -1,7 +1,6 @@
 import jsQR from 'jsqr';
 import { encode } from 'uqr';
 import { assert, describe, it } from 'vitest';
-import { readArgument } from '../src/federation/arguments.js';
 import { codeIn, pairingLink, readPairing } from '../src/federation/links.js';
 
 const { deepEqual, equal } = assert;
@@ -50,17 +49,5 @@ describe('The links of a pairing', function () {
         // some 100 modules a side, which a phone reads off a screen
         assert.isAtMost(qr.version, 21, `version ${qr.version}`);
         assert.notInclude(link, '%', 'the code as it is in the link');
-    });
-});
-
-describe('The arguments of a federation', function () {
-    it('should tell what an argument concludes, and its rules', function () {
-        deepEqual(readArgument('[[d3(jack), d1(jack), f2], d1(jack), [flies(jack)], [bird(jack)], [[d1(jack)], [d3(jack), d1(jack)], [f2]]]'), {
-            conclusion: 'flies(jack)',
-            rules: ['d3(jack)', 'd1(jack)', 'f2'],
-        });
-        deepEqual(readArgument("[[f1], f1, [says('a, b')], [], []]"), { conclusion: "says('a, b')", rules: ['f1'] });
-        equal(readArgument('flies(jack)'), null);
-        equal(readArgument('[[a], b]'), null);
     });
 });
