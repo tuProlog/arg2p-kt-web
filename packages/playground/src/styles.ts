@@ -363,27 +363,6 @@ export const styles = css`
         color: var(--arg2p-text);
         border-bottom-color: var(--arg2p-accent);
     }
-    .switch {
-        display: inline-flex;
-        margin-bottom: 4px;
-    }
-    .switch button {
-        padding: 2px 10px;
-        font-size: 13px;
-        border-radius: 0;
-    }
-    .switch button:first-child {
-        border-radius: 6px 0 0 6px;
-    }
-    .switch button:last-child {
-        border-radius: 0 6px 6px 0;
-        border-left: none;
-    }
-    .switch button.active {
-        color: #ffffff;
-        background: var(--arg2p-accent);
-        border-color: var(--arg2p-accent);
-    }
     .panel {
         flex: 1;
         min-height: 0;
@@ -499,6 +478,33 @@ export const styles = css`
         }
         .wide {
             display: none;
+        }
+    }
+
+    /* phones: the bar on top on one line, and the menus as wide as the screen, under the bar they open from */
+    @media (max-width: 600px) {
+        .top {
+            gap: 8px;
+        }
+        .top .version {
+            display: none;
+        }
+        details.menu > summary {
+            white-space: nowrap;
+        }
+        .top,
+        .tabs,
+        .bar {
+            position: relative;
+        }
+        details.menu {
+            position: static;
+        }
+        .menu-list,
+        .menu-list.right {
+            left: 8px;
+            right: 8px;
+            min-width: 0;
         }
     }
 `;

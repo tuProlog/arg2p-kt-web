@@ -27,7 +27,6 @@ import { styles } from './styles.js';
 import { currentTheme, followSystem, toggleTheme } from './theme.js';
 
 type Panel = 'results' | 'flags' | 'console';
-type View = 'graph' | 'drawing';
 
 const DOCS = 'https://tuprolog.github.io/arg2p-kt/';
 const PROJECT = 'https://github.com/tuProlog/arg2p-kt';
@@ -42,7 +41,6 @@ export class Arg2pPlayground extends LitElement {
         active: { state: true },
         content: { state: true },
         panel: { state: true },
-        view: { state: true },
         busy: { state: true },
         output: { state: true },
         notice: { state: true },
@@ -66,7 +64,6 @@ export class Arg2pPlayground extends LitElement {
     private active: string | null = null;
     private content: Content = blank();
     private panel: Panel = 'results';
-    private view: View = 'graph';
     // a query being solved, or a solution being computed
     private busy = false;
     private output = '';
@@ -75,8 +72,10 @@ export class Arg2pPlayground extends LitElement {
     private theme = currentTheme();
     private renaming: string | null = null;
     private layout: Layout = loadLayout();
-    // where the arguments of an abstract framework are: its drawing and its graph show them in the same places
+    // where the arguments of an abstract framework are drawn, kept while it is solved again
     private positions: Positions | null = null;
+    // whether the drawing, rather than the graph, was shown last
+    private drawn = false;
     // the graph of the solution shown, and the run it comes from
     private graph: GraphData | null = null;
     private runs = 0;
@@ -111,7 +110,9 @@ export class Arg2pPlayground extends LitElement {
     }
 
     protected override updated(changed: PropertyValues): void {
-        if (changed.has('panel') || changed.has('view')) {
+        // the drawing, or the graph, fits the room it is given when shown
+        if (changed.has('panel') || this.abstract !== this.drawn) {
+            this.drawn = this.abstract;
             this.find<Arg2pGraph>('arg2p-graph')?.fit();
             this.find<Arg2pFramework>('arg2p-framework')?.fit();
         }
@@ -125,7 +126,6 @@ export class Arg2pPlayground extends LitElement {
 
     private showDocument(doc: Content): void {
         this.content = { theory: doc.theory, query: doc.query, flags: doc.flags };
-        this.view = this.abstract ? 'drawing' : 'graph';
         this.positions = null;
         this.clearResults();
     }
@@ -502,15 +502,6 @@ export class Arg2pPlayground extends LitElement {
         return html`
             <div class="panel-tabs" role="tablist">
                 ${tab('results', 'Solutions')} ${tab('flags', 'Flags')} ${tab('console', this.output === '' ? 'Console' : 'Console •')}
-                <span class="spacer"></span>
-                ${this.abstract && this.panel === 'results'
-                    ? html`
-                          <div class="switch" role="group" aria-label="View">
-                              <button type="button" class=${this.view === 'drawing' ? 'active' : ''} title="Draw the framework: what is drawn is written in the theory" @click=${() => (this.view = 'drawing')}>Drawing</button>
-                              <button type="button" class=${this.view === 'graph' ? 'active' : ''} title="The graph of the solution" @click=${() => (this.view = 'graph')}>Graph</button>
-                          </div>
-                      `
-                    : nothing}
             </div>
             <div class="panel results" style="--solutions: ${this.layout.solutions}%" ?hidden=${this.panel !== 'results'}>
                 <arg2p-solutions
@@ -524,13 +515,11 @@ export class Arg2pPlayground extends LitElement {
                 ${this.divider('solutions', 'Width of the solutions')}
                 <div class="view">
                     <arg2p-graph
-                        ?hidden=${this.abstract && this.view === 'drawing'}
+                        ?hidden=${this.abstract}
                         file-name=${this.name}
-                        .positions=${this.positions}
-                        @arg2p-positions=${(e: CustomEvent<{ positions: Positions }>) => (this.positions = e.detail.positions)}
                     ></arg2p-graph>
                     <arg2p-framework
-                        ?hidden=${!(this.abstract && this.view === 'drawing')}
+                        ?hidden=${!this.abstract}
                         file-name=${this.name}
                         .theory=${this.content.theory}
                         .positions=${this.positions}
