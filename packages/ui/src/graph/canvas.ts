@@ -9,7 +9,7 @@ import { MUTUAL_STYLE, markMutual, placeByName, placesAll, positionsOf, type Pos
 // it is headless: it keeps the elements, their positions and their events alike, and draws nothing.
 
 // The font the nodes are written in, and how their size follows from what they say
-export const NODE_FONT = { family: 'arial, sans-serif', size: 14 };
+const NODE_FONT = { family: 'arial, sans-serif', size: 14 };
 const LINE_HEIGHT = 20;
 const PADDING_X = 24;
 const PADDING_Y = 14;
@@ -62,7 +62,7 @@ const STYLE: StylesheetJson = [
 ];
 
 /** A Cytoscape instance drawing in [container], or a headless one where nothing can be drawn */
-export function drawing(container: HTMLElement, style: StylesheetJson): Core {
+function drawing(container: HTMLElement, style: StylesheetJson): Core {
     const headless = canvas() === null;
     return cytoscape({
         ...(headless ? { headless: true, styleEnabled: true } : { container }),
@@ -76,7 +76,7 @@ export function drawing(container: HTMLElement, style: StylesheetJson): Core {
 const FIT_ZOOM = 1.25;
 
 /** [cy] fitted to its area, no closer than FIT_ZOOM */
-export function fit(cy: Core): void {
+function fit(cy: Core): void {
     cy.fit(undefined, 30);
     if (cy.zoom() > FIT_ZOOM) {
         cy.zoom(FIT_ZOOM);
