@@ -48,6 +48,7 @@ export class Arg2pPlayground extends LitElement {
         shared: { state: true },
         theme: { state: true },
         renaming: { state: true },
+        layout: { state: true },
     };
 
     private readonly engine = new JsEngine();
@@ -71,6 +72,7 @@ export class Arg2pPlayground extends LitElement {
     private shared: string | null = null;
     private theme = currentTheme();
     private renaming: string | null = null;
+    private layout: Layout = loadLayout();
     // the graph of the solution shown, and the run it comes from
     private graph: GraphData | null = null;
     private runs = 0;
@@ -255,13 +257,58 @@ export class Arg2pPlayground extends LitElement {
         }
     }
 
+    // --- layout --------------------------------------------------------------------------------------------------------
+
+    // A divider between two columns, dragged (or moved with the arrows) to share the width of its container between
+    // them: the share of the first one, in percent, is kept in the layout
+    private divider(column: keyof Layout, label: string) {
+        const set = (share: number) => {
+            this.layout = { ...this.layout, [column]: Math.min(80, Math.max(15, share)) };
+            saveLayout(this.layout);
+        };
+        const container = (element: Element) => element.parentElement!.getBoundingClientRect();
+        return html`<div
+            class="divider"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label=${label}
+            aria-valuenow=${Math.round(this.layout[column])}
+            tabindex="0"
+            title="Drag to resize"
+            @pointerdown=${(e: PointerEvent) => {
+                const divider = e.currentTarget as HTMLElement;
+                divider.setPointerCapture(e.pointerId);
+                divider.classList.add('dragging');
+                const move = (event: PointerEvent) => {
+                    const box = container(divider);
+                    set(((event.clientX - box.left) / box.width) * 100);
+                };
+                const done = () => {
+                    divider.classList.remove('dragging');
+                    divider.removeEventListener('pointermove', move);
+                    divider.removeEventListener('pointerup', done);
+                    divider.removeEventListener('pointercancel', done);
+                };
+                divider.addEventListener('pointermove', move);
+                divider.addEventListener('pointerup', done);
+                divider.addEventListener('pointercancel', done);
+                e.preventDefault();
+            }}
+            @keydown=${(e: KeyboardEvent) => {
+                if (e.key === 'ArrowLeft') set(this.layout[column] - 2);
+                else if (e.key === 'ArrowRight') set(this.layout[column] + 2);
+            }}
+        ></div>`;
+    }
+
     // --- rendering -----------------------------------------------------------------------------------------------------
 
     protected override render() {
         return html`
             ${this.renderTop()} ${this.renderTabs()}
-            <main>
+            <main style="--theory: ${this.layout.theory}%">
                 ${this.renderTheory()}
+                ${this.divider('theory', 'Width of the theory')}
                 <section class="work">${this.renderQuery()} ${this.renderPanels()}</section>
             </main>
             ${this.renderShare()}
@@ -316,7 +363,9 @@ export class Arg2pPlayground extends LitElement {
     private renderTabs() {
         const closed = this.workspace.closed;
         return html`
-            <nav class="tabs" role="tablist" aria-label="Open theories">
+            <nav class="tabs">
+                <!-- the tabs scroll in a list of their own: the menus after it would be cut by the scrolling -->
+                <div class="tab-list" role="tablist" aria-label="Open theories">
                 ${this.workspace.tabs.map(
                     doc => html`
                         <div
@@ -362,12 +411,13 @@ export class Arg2pPlayground extends LitElement {
                         </div>
                     `,
                 )}
+                </div>
                 <button type="button" class="new" title="New theory" aria-label="New theory" @click=${() => this.session.open(blank(), null)}>+</button>
                 <details class="menu history">
                     <summary title="Recently closed theories" aria-label="Recently closed theories">
                         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
                     </summary>
-                    <div class="menu-list right" role="menu">
+                    <div class="menu-list" role="menu">
                         <div class="menu-header">Recently closed</div>
                         ${closed.length === 0
                             ? html`<span class="menu-empty">Nothing closed yet</span>`
@@ -457,7 +507,7 @@ export class Arg2pPlayground extends LitElement {
                       `
                     : nothing}
             </div>
-            <div class="panel results" ?hidden=${this.panel !== 'results'}>
+            <div class="panel results" style="--solutions: ${this.layout.solutions}%" ?hidden=${this.panel !== 'results'}>
                 <arg2p-solutions
                     ?hide-exhausted-no=${this.abstract}
                     @arg2p-solution=${(e: CustomEvent<{ solution: SolutionData; run: Run | null }>) => this.showSolution(e.detail.solution, e.detail.run)}
@@ -466,6 +516,7 @@ export class Arg2pPlayground extends LitElement {
                         (this.notice = { text: e.detail.error.stopped ? 'Stopped before the next solution.' : e.detail.error.message, error: !e.detail.error.stopped })}
                     @arg2p-error-select=${(e: CustomEvent<{ error: EngineError }>) => this.reveal(e.detail.error)}
                 ></arg2p-solutions>
+                ${this.divider('solutions', 'Width of the solutions')}
                 <div class="view">
                     <arg2p-graph ?hidden=${this.abstract && this.view === 'drawing'} file-name=${this.name}></arg2p-graph>
                     <arg2p-framework
@@ -523,6 +574,34 @@ export class Arg2pPlayground extends LitElement {
     }
 
     static override styles = styles;
+}
+
+// The widths of the columns, in percent of their container: the theory, and the solutions beside the graph
+interface Layout {
+    theory: number;
+    solutions: number;
+}
+
+const LAYOUT = 'arg2p.layout';
+
+function loadLayout(): Layout {
+    const layout = { theory: 40, solutions: 30 };
+    try {
+        const stored = JSON.parse(localStorage.getItem(LAYOUT) ?? '{}') as Partial<Layout>;
+        if (typeof stored.theory === 'number') layout.theory = stored.theory;
+        if (typeof stored.solutions === 'number') layout.solutions = stored.solutions;
+    } catch {
+        // the default layout
+    }
+    return layout;
+}
+
+function saveLayout(layout: Layout): void {
+    try {
+        localStorage.setItem(LAYOUT, JSON.stringify(layout));
+    } catch {
+        // not remembered: it applies all the same
+    }
 }
 
 function example(id: string): Content {

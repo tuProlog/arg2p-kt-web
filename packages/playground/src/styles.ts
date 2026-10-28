@@ -180,8 +180,15 @@ export const styles = css`
         gap: 2px;
         padding: 4px 8px 0 8px;
         border-bottom: 1px solid var(--arg2p-border);
+    }
+    .tab-list {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        min-width: 0;
         overflow-x: auto;
         scrollbar-width: thin;
+        align-self: stretch;
     }
     .tab {
         display: inline-flex;
@@ -230,9 +237,32 @@ export const styles = css`
         flex: 1;
         min-height: 0;
         display: grid;
-        grid-template-columns: minmax(300px, 2fr) 3fr;
-        gap: 10px;
+        grid-template-columns: minmax(240px, var(--theory)) auto minmax(320px, 1fr);
         padding: 10px;
+    }
+    /* what resizes two columns: a strip between them, dragged or moved with the arrows */
+    .divider {
+        width: 10px;
+        cursor: col-resize;
+        touch-action: none;
+        position: relative;
+        outline: none;
+    }
+    .divider::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 4px;
+        width: 2px;
+        border-radius: 1px;
+        background: transparent;
+        transition: background 0.15s;
+    }
+    .divider:hover::after,
+    .divider:focus-visible::after,
+    .divider.dragging::after {
+        background: var(--arg2p-accent);
     }
     .theory,
     .work {
@@ -360,8 +390,7 @@ export const styles = css`
     }
     .results {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) 2.2fr;
-        gap: 10px;
+        grid-template-columns: minmax(180px, var(--solutions)) auto minmax(240px, 1fr);
     }
     arg2p-solutions {
         overflow: auto;
@@ -382,7 +411,8 @@ export const styles = css`
     .results:has(arg2p-graph[empty]:not([hidden])) {
         grid-template-columns: 1fr;
     }
-    .results:has(arg2p-graph[empty]:not([hidden])) .view {
+    .results:has(arg2p-graph[empty]:not([hidden])) .view,
+    .results:has(arg2p-graph[empty]:not([hidden])) .divider {
         display: none;
     }
     .flags,
@@ -452,12 +482,17 @@ export const styles = css`
         }
         main {
             grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .divider {
+            display: none;
         }
         #theory {
             height: 45vh;
         }
         .results {
             grid-template-columns: 1fr;
+            gap: 10px;
         }
         .view {
             height: 60vh;

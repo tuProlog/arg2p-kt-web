@@ -41,8 +41,11 @@ const STYLE: StylesheetJson = [
     },
     { selector: 'edge:selected', style: { width: 4 } },
     // what the theory derives and does not declare: drawn, not edited by drawing
-    { selector: 'node.derived', style: { 'border-width': 2, 'border-style': 'dashed', 'border-color': 'data(outline)' } },
-    { selector: 'edge.derived', style: { 'line-style': 'dashed' } },
+    { selector: 'node.derived', style: { 'border-width': 3, 'border-style': 'dashed', 'border-color': 'data(outline)', 'background-opacity': 0.8 } },
+    {
+        selector: 'edge.derived',
+        style: { 'line-style': 'dashed', 'line-dash-pattern': [9, 6], width: 2.5, 'arrow-scale': 1.4 },
+    },
 ];
 
 /**
@@ -67,6 +70,7 @@ export class Arg2pFramework extends LitElement {
         selected: { state: true },
         renaming: { state: true },
         source: { state: true },
+        derived: { state: true },
     };
 
     /** The theory drawn */
@@ -82,6 +86,8 @@ export class Arg2pFramework extends LitElement {
     private renaming: { name: string; value: string } | null = null;
     // the attacker picked, in attack mode
     private source: string | null = null;
+    // whether the graph adds to the framework what the theory derives
+    private derived = false;
 
     private cy: Core | null = null;
     private unfollow = () => {};
@@ -183,6 +189,7 @@ export class Arg2pFramework extends LitElement {
             ...this.drawn.attacks.map(it => ({ data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, color: attackColor(it.from) }, classes: '' })),
             ...derivedAttacks.map(it => ({ data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, color: attackColor(it.from) }, classes: 'derived' })),
         ];
+        this.derived = nodes.some(it => it.classes === 'derived') || derivedAttacks.length > 0;
         const wanted = new Set([...nodes, ...edges].map(it => it.data.id));
         const first = cy.nodes().empty();
         const added: NodeSingular[] = [];
@@ -363,6 +370,12 @@ export class Arg2pFramework extends LitElement {
             </div>
             <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
                 <div class="canvas"></div>
+                ${this.derived
+                    ? html`<div class="legend" part="legend">
+                          <span><span class="line"></span>declared in the theory: drawing changes it</span>
+                          <span><span class="line derived"></span>derived by its rules: change the rules to change it</span>
+                      </div>`
+                    : nothing}
                 ${renaming === null
                     ? nothing
                     : html`<input
@@ -441,6 +454,34 @@ export class Arg2pFramework extends LitElement {
             .canvas {
                 position: absolute;
                 inset: 0;
+            }
+            .legend {
+                position: absolute;
+                left: 8px;
+                bottom: 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: var(--_muted);
+                background: color-mix(in srgb, var(--_surface) 88%, transparent);
+                border: 1px solid var(--_border);
+                border-radius: 6px;
+                pointer-events: none;
+            }
+            .legend > span {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .legend .line {
+                display: inline-block;
+                width: 28px;
+                border-top: 2.5px solid var(--_muted);
+            }
+            .legend .line.derived {
+                border-top-style: dashed;
             }
             .rename {
                 position: absolute;
