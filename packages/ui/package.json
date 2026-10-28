@@ -7,7 +7,7 @@
   "author": "Giuseppe Pisano",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tuProlog/arg2p-kt-web",
+    "url": "git+https://github.com/tuProlog/arg2p-kt-web.git",
     "directory": "packages/ui"
   },
   "exports": {
