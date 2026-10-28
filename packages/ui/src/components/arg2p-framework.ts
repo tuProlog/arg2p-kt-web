@@ -4,11 +4,10 @@ import type { GraphData } from '../engine.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
 import type { Framework } from '../formats/frameworks.js';
 import { NODE_FONT, drawing, fit, followSize, nodeSize, png } from '../graph/canvas.js';
+import { MUTUAL_STYLE, markMutual, placeByName, positionsOf, type Positions } from '../graph/positions.js';
 import { labelColor, tokens } from '../theme.js';
 
 const NAME = /^[a-z][a-zA-Z0-9_]*$/;
-// how far apart arguments added by text are put, around the middle of the view
-const SPREAD = 90;
 
 type Mode = 'select' | 'argument' | 'attack';
 
@@ -40,6 +39,7 @@ const STYLE: StylesheetJson = [
         },
     },
     { selector: 'edge:selected', style: { width: 4 } },
+    MUTUAL_STYLE,
     // what the theory derives and does not declare: drawn, not edited by drawing
     { selector: 'node.derived', style: { 'border-width': 3, 'border-style': 'dashed', 'border-color': 'data(outline)', 'background-opacity': 0.8 } },
     {
@@ -64,6 +64,7 @@ export class Arg2pFramework extends LitElement {
     static override properties = {
         theory: {},
         graph: { attribute: false },
+        positions: { attribute: false },
         readonly: { type: Boolean, reflect: true },
         fileName: { attribute: 'file-name' },
         mode: { state: true },
@@ -77,6 +78,8 @@ export class Arg2pFramework extends LitElement {
     theory = '';
     /** The graph of a solution of [theory], to show its labels and what it derives; null when there is none */
     graph: GraphData | null = null;
+    /** Where the arguments are, by name: shared with the graph of the framework (see arg2p-positions) */
+    positions: Positions | null = null;
     readonly = false;
     /** The name of the picture the framework is saved as, with no extension */
     fileName = 'framework';
@@ -125,6 +128,7 @@ export class Arg2pFramework extends LitElement {
             if (event.target === cy) this.add(event.position);
             else if (event.target.isNode()) this.startRename(event.target.id());
         });
+        cy.on('dragfree', 'node', () => this.tellPositions());
         cy.on('select unselect', () => {
             this.selected = cy.$(':selected').nonempty();
         });
@@ -141,6 +145,8 @@ export class Arg2pFramework extends LitElement {
 
     protected override updated(changed: PropertyValues): void {
         if (changed.has('theory') || changed.has('graph')) this.draw();
+        // placed elsewhere (by the graph of the framework): moved there
+        else if (changed.has('positions') && this.cy !== null && placeByName(this.cy, idOf, this.positions)) this.tellPositions();
         if (changed.has('readonly')) {
             if (this.readonly) this.setMode('select');
             this.cy?.autoungrabify(this.readonly);
@@ -192,14 +198,15 @@ export class Arg2pFramework extends LitElement {
         this.derived = nodes.some(it => it.classes === 'derived') || derivedAttacks.length > 0;
         const wanted = new Set([...nodes, ...edges].map(it => it.data.id));
         const first = cy.nodes().empty();
-        const added: NodeSingular[] = [];
+        // the arguments stay where they are, or go where the graph has them
+        const placed = { ...positionsOf(cy, idOf), ...this.positions };
 
         cy.batch(() => {
             cy.elements().filter(it => !wanted.has(it.id())).remove();
             nodes.forEach(({ data, classes }) => {
                 const node = cy.getElementById(data.id);
                 if (node.nonempty()) node.data(data).classes(classes);
-                else added.push(cy.add({ group: 'nodes', data, classes }));
+                else cy.add({ group: 'nodes', data, classes });
             });
             edges.forEach(({ data, classes }) => {
                 const edge = cy.getElementById(data.id);
@@ -208,21 +215,20 @@ export class Arg2pFramework extends LitElement {
             });
         });
 
-        if (first && added.length > 0) {
-            cy.layout({ name: 'cose', animate: false, randomize: true, fit: false }).run();
-            fit(cy);
-        } else {
-            const extent = cy.extent();
-            const middle = { x: (extent.x1 + extent.x2) / 2, y: (extent.y1 + extent.y2) / 2 };
-            added
-                .filter(it => it.position().x === 0 && it.position().y === 0)
-                .forEach((node, i) => {
-                    const angle = i * 2.4;
-                    const radius = SPREAD * Math.sqrt(i + 1) * 0.6;
-                    node.position({ x: middle.x + radius * Math.cos(angle), y: middle.y + radius * Math.sin(angle) });
-                });
-        }
+        markMutual(cy);
+        const laid = placeByName(cy, idOf, placed);
+        // what the graph does not know where to place yet (an argument added, laid out, renamed): told
+        const told = new Set(Object.keys(this.positions ?? {}));
+        if (laid || cy.nodes().some(it => !told.has((it as NodeSingular).id())) || told.size !== cy.nodes().length) this.tellPositions();
+        if (first && cy.nodes().nonempty()) fit(cy);
         if (this.source !== null && cy.getElementById(this.source).empty()) this.source = null;
+    }
+
+    // Where the arguments are now, for the graph of the framework to place them alike
+    private tellPositions(): void {
+        if (this.cy === null) return;
+        this.positions = positionsOf(this.cy, idOf);
+        this.dispatchEvent(new CustomEvent('arg2p-positions', { detail: { positions: this.positions }, bubbles: true, composed: true }));
     }
 
     private tap(event: EventObject): void {
@@ -501,6 +507,11 @@ export class Arg2pFramework extends LitElement {
             }
         `,
     ];
+}
+
+// An argument drawn is called by its name
+function idOf(node: NodeSingular): string {
+    return node.id();
 }
 
 customElements.define('arg2p-framework', Arg2pFramework);

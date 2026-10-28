@@ -11,6 +11,7 @@ import {
     toTheory,
     type EngineError,
     type GraphData,
+    type Positions,
     type Run,
     type SolutionData,
 } from '@tuprolog/arg2p-ui/data';
@@ -49,6 +50,7 @@ export class Arg2pPlayground extends LitElement {
         theme: { state: true },
         renaming: { state: true },
         layout: { state: true },
+        positions: { state: true },
     };
 
     private readonly engine = new JsEngine();
@@ -73,6 +75,8 @@ export class Arg2pPlayground extends LitElement {
     private theme = currentTheme();
     private renaming: string | null = null;
     private layout: Layout = loadLayout();
+    // where the arguments of an abstract framework are: its drawing and its graph show them in the same places
+    private positions: Positions | null = null;
     // the graph of the solution shown, and the run it comes from
     private graph: GraphData | null = null;
     private runs = 0;
@@ -122,6 +126,7 @@ export class Arg2pPlayground extends LitElement {
     private showDocument(doc: Content): void {
         this.content = { theory: doc.theory, query: doc.query, flags: doc.flags };
         this.view = this.abstract ? 'drawing' : 'graph';
+        this.positions = null;
         this.clearResults();
     }
 
@@ -518,11 +523,18 @@ export class Arg2pPlayground extends LitElement {
                 ></arg2p-solutions>
                 ${this.divider('solutions', 'Width of the solutions')}
                 <div class="view">
-                    <arg2p-graph ?hidden=${this.abstract && this.view === 'drawing'} file-name=${this.name}></arg2p-graph>
+                    <arg2p-graph
+                        ?hidden=${this.abstract && this.view === 'drawing'}
+                        file-name=${this.name}
+                        .positions=${this.positions}
+                        @arg2p-positions=${(e: CustomEvent<{ positions: Positions }>) => (this.positions = e.detail.positions)}
+                    ></arg2p-graph>
                     <arg2p-framework
                         ?hidden=${!(this.abstract && this.view === 'drawing')}
                         file-name=${this.name}
                         .theory=${this.content.theory}
+                        .positions=${this.positions}
+                        @arg2p-positions=${(e: CustomEvent<{ positions: Positions }>) => (this.positions = e.detail.positions)}
                         @arg2p-theory-change=${(e: CustomEvent<{ theory: string }>) => this.edit({ theory: e.detail.theory })}
                     ></arg2p-framework>
                 </div>

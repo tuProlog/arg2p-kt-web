@@ -1,9 +1,10 @@
-import type { Core, EventObject, StylesheetJson } from 'cytoscape';
+import type { Core, EventObject, NodeSingular, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Run, type SolutionData } from '../engine.js';
 import { NODE_FONT, drawing, fit, followSize, nodeSize, png } from '../graph/canvas.js';
 import { attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
+import { MUTUAL_STYLE, markMutual, placeByName, positionsOf, type Positions } from '../graph/positions.js';
 import { levelsOf, supportsOf } from '../graph/levels.js';
 import { cssColor, labelColor, tokens } from '../theme.js';
 
@@ -50,6 +51,7 @@ const STYLE: StylesheetJson = [
     },
     // an abstract framework is placed by forces: its attacks bend apart when they are mutual
     { selector: 'edge.free', style: { 'curve-style': 'bezier' } },
+    MUTUAL_STYLE,
     {
         selector: 'edge.support',
         style: { 'curve-style': 'straight', 'line-style': 'dashed', 'line-dash-pattern': [3, 4], width: 1.5, 'arrow-scale': 0.7 },
@@ -71,6 +73,7 @@ const STYLE: StylesheetJson = [
 export class Arg2pGraph extends LitElement {
     static override properties = {
         graph: { attribute: false },
+        positions: { attribute: false },
         stages: { attribute: false },
         showSupports: { type: Boolean, attribute: 'show-supports', reflect: true },
         showConclusions: { type: Boolean, attribute: 'show-conclusions', reflect: true },
@@ -85,6 +88,8 @@ export class Arg2pGraph extends LitElement {
     graph: GraphData = EMPTY_GRAPH;
     /** The stages of the computation of [graph], if it can be browsed */
     stages: Stages | null = null;
+    /** Where the arguments of an abstract framework are, by name: shared with its drawing (see arg2p-positions) */
+    positions: Positions | null = null;
     showSupports = true;
     showConclusions = false;
     /** The name of the picture the graph is saved as, with no extension */
@@ -160,12 +165,17 @@ export class Arg2pGraph extends LitElement {
         });
         // the popup follows its node while the graph is dragged or zoomed
         cy.on('viewport position', () => this.placePopup());
+        cy.on('dragfree', 'node', () => {
+            if (isAbstract(this.drawn)) this.tellPositions();
+        });
         this.cy = cy;
         this.unfollow = followSize(cy, this.renderRoot.querySelector<HTMLElement>('.canvas')!);
     }
 
     protected override updated(changed: PropertyValues): void {
         if (changed.has('drawn') || changed.has('showSupports') || changed.has('showConclusions')) this.draw();
+        // placed elsewhere (by the drawing of the framework): moved there
+        else if (changed.has('positions') && this.cy !== null && isAbstract(this.drawn)) placeByName(this.cy, nameOfNode, this.positions);
         if (changed.has('shown')) this.placePopup();
     }
 
@@ -198,7 +208,7 @@ export class Arg2pGraph extends LitElement {
 
         const nodes = graph.arguments.map(it => {
             const label = nodeLabel(it, abstract, this.showConclusions);
-            return { data: { id: it.id, label, color: labelColor(this, it.label), outline, ...nodeSize(label) }, classes: '' };
+            return { data: { id: it.id, name: nameOf(it, abstract), label, color: labelColor(this, it.label), outline, ...nodeSize(label) }, classes: '' };
         });
         const edges = [
             ...graph.attacks.map(it => ({
@@ -220,7 +230,15 @@ export class Arg2pGraph extends LitElement {
                 else cy.add({ group: 'source' in data ? 'edges' : 'nodes', data, classes });
             });
         });
+        markMutual(cy);
         this.place(graph, abstract, supports, wasEmpty);
+    }
+
+    // Where the arguments of an abstract framework are now, for its drawing to place them alike
+    private tellPositions(): void {
+        if (this.cy === null) return;
+        this.positions = positionsOf(this.cy, nameOfNode);
+        this.dispatchEvent(new CustomEvent('arg2p-positions', { detail: { positions: this.positions }, bubbles: true, composed: true }));
     }
 
     // Computed again for every graph drawn: the same arguments get the same place, so stepping through the stages does
@@ -230,7 +248,7 @@ export class Arg2pGraph extends LitElement {
         const cy = this.cy!;
         if (graph.arguments.length === 0) return;
         if (abstract) {
-            cy.layout({ name: 'cose', animate: false, randomize: first, fit: false }).run();
+            if (placeByName(cy, nameOfNode, this.positions)) this.tellPositions();
             if (first) fit(cy);
             return;
         }
@@ -567,6 +585,11 @@ export class Arg2pGraph extends LitElement {
             }
         `,
     ];
+}
+
+// The name of an argument drawn: what the theory calls it, in an abstract framework
+function nameOfNode(node: NodeSingular): string {
+    return node.data('name') as string;
 }
 
 customElements.define('arg2p-graph', Arg2pGraph);

@@ -22,3 +22,4 @@ export {
     type Settings,
 } from './flags/schema.js';
 export { statedFlags, statedProfile, withValues, withNone, withSwitch, without } from './flags/text.js';
+export type { Positions } from './graph/positions.js';

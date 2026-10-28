@@ -125,6 +125,27 @@ describe('<arg2p-graph>', function () {
         equal(graph.drawing!.getElementById('A0').position().x, where);
     });
 
+    it('should place an abstract framework as its drawing does, and tell where its arguments are', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        const told: Record<string, { x: number; y: number }>[] = [];
+        graph.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
+        graph.positions = { a: { x: 5, y: 6 }, b: { x: 100, y: 6 }, x: { x: 50, y: 90 } };
+        graph.graph = ABSTRACT;
+        await graph.updateComplete;
+        deepEqual(graph.drawing!.getElementById('A1').position(), { x: 100, y: 6 });
+        equal(told.length, 0);
+        // moved by the drawing
+        graph.positions = { a: { x: 5, y: 6 }, b: { x: 200, y: 6 }, x: { x: 50, y: 90 } };
+        await graph.updateComplete;
+        deepEqual(graph.drawing!.getElementById('A1').position(), { x: 200, y: 6 });
+        // a graph with no positions lays itself out, and tells
+        const other = await element<Arg2pGraph>('arg2p-graph');
+        other.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
+        other.graph = ABSTRACT;
+        await other.updateComplete;
+        deepEqual(Object.keys(told.at(-1)!).sort(), ['a', 'b', 'x']);
+    });
+
     it('should name the arguments of an abstract framework as the theory does', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
         graph.graph = ABSTRACT;
@@ -275,6 +296,28 @@ describe('<arg2p-framework>', function () {
         await editor.updateComplete;
         equal(theories.at(-1), THEORY.replace('b.\na -> b.', 'bee.\na -> bee.'));
         ok(editor.drawing!.getElementById('bee').nonempty());
+    });
+
+    it('should bend mutual attacks apart, so that both show', async function () {
+        const { editor } = await framework('graphBuildMode(abstract).\na <-> b.\nb -> c.\n');
+        const cy = editor.drawing!;
+        ok(cy.getElementById('a->b').hasClass('mutual'));
+        ok(cy.getElementById('b->a').hasClass('mutual'));
+        equal(cy.getElementById('b->c').hasClass('mutual'), false);
+    });
+
+    it('should place the arguments where the graph has them, and tell where they are', async function () {
+        const { editor } = await framework();
+        const told: Record<string, { x: number; y: number }>[] = [];
+        editor.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
+        editor.positions = { a: { x: 10, y: 20 }, b: { x: 300, y: 40 } };
+        await editor.updateComplete;
+        deepEqual(editor.drawing!.getElementById('b').position(), { x: 300, y: 40 });
+        // an argument added by text goes next to the others, and is told
+        editor.theory = `${THEORY}c.\n`;
+        await editor.updateComplete;
+        deepEqual(Object.keys(told.at(-1)!).sort(), ['a', 'b', 'c']);
+        deepEqual(told.at(-1)!.a, { x: 10, y: 20 });
     });
 
     it('should forget the labels of a graph once the theory changes', async function () {
