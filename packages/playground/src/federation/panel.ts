@@ -262,7 +262,7 @@ export class Arg2pFederation extends LitElement {
 
     private renderStep() {
         const step = this.step;
-        const relay = new URL(this.federation?.relay ?? DEFAULT_RELAY).host;
+        const relay = hostOf(this.federation?.relay ?? DEFAULT_RELAY);
         switch (step.kind) {
             case 'idle':
                 return nothing;
@@ -541,6 +541,15 @@ export class Arg2pFederation extends LitElement {
             }
         `,
     ];
+}
+
+// The host of the relay at [url], or the URL as it was set when it is none
+function hostOf(url: string): string {
+    try {
+        return new URL(url).host;
+    } catch {
+        return url;
+    }
 }
 
 // Whether [text], scanned, is a link of a pairing of [kind] (or its code)
