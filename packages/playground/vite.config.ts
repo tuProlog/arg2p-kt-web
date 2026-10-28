@@ -26,9 +26,10 @@ export default defineConfig(({ command, isPreview }) => ({
     },
     plugins: [
         // The service worker precaches the build, so that the playground is installable and works offline; every build
-        // makes a new one, and a deploy replaces the cached version on the next start
+        // makes a new one, which waits for the page to load it (see main.ts): taking over by itself, it would reload
+        // a page in the middle of a run or of a pairing
         VitePWA({
-            registerType: 'autoUpdate',
+            registerType: 'prompt',
             injectRegister: null,
             // the manifest is public/manifest.webmanifest, which index.html links
             manifest: false,
@@ -37,8 +38,6 @@ export default defineConfig(({ command, isPreview }) => ({
                 maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
                 // shared links carry their state in the query string (?s=...): they all open the precached page
                 ignoreURLParametersMatching: [/.*/],
-                clientsClaim: true,
-                skipWaiting: true,
             },
         }),
     ],
