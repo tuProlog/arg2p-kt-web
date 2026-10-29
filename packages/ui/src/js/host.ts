@@ -63,7 +63,8 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
     }
 
     function solve({ id, theory, query, flags }: { id: number; theory: string; query: string; flags: string }): void {
-        if (/^\s*$/.test(query)) {
+        const written = normalizedQuery(query);
+        if (written === '') {
             current = null;
             return post({ type: 'failed', id, error: { name: 'Query error', message: 'Query is a mandatory field.', syntax: null } });
         }
@@ -82,7 +83,6 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
                 throw failure('Theory error', error, 'theory');
             }
             const profile = profileOf(solver);
-            const written = query.trim().replace(/\.$/, '');
             let solutions: Solutions;
             try {
                 solutions = solver.solve(written);
@@ -156,12 +156,18 @@ function profileOf(solver: Arg2p): string {
     }
 }
 
+// The query [text] as the solver is given it: with no blanks around it, nor a full stop at its end (empty for none)
+function normalizedQuery(text: string): string {
+    return text.trim().replace(/\.$/, '');
+}
+
 /** Where [text], a theory (or flags) or a query, does not parse; null if it does */
 export function check(text: string, kind: 'theory' | 'query'): SyntaxProblem | null {
-    if (kind === 'query' && /^\s*$/.test(text)) return null;
+    const query = kind === 'query' ? normalizedQuery(text) : null;
+    if (query === '') return null;
     try {
         // a theory read as a solver reads it (until the API checks texts by itself)
-        if (kind === 'query') Value.parse(text.trim().replace(/\.$/, ''));
+        if (query !== null) Value.parse(query);
         else Arg2p.of(text, Flags.none());
         return null;
     } catch (error) {
