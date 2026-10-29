@@ -13,6 +13,11 @@ const CURVE = 0.25;
 const CURVE_LENGTH = 160;
 const MIN_CURVE = 0.06;
 
+/** The id of the edge of an attack from [from] to [to], `a->b`: by it the attack, and the one back, are found */
+export function attackId(from: string, to: string): string {
+    return `${from}->${to}`;
+}
+
 /** Whether the arguments of [graph] are those of an abstract framework: named by the theory, with no structure */
 export function isAbstract(graph: GraphData): boolean {
     return graph.profile === 'abstract';

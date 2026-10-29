@@ -5,7 +5,7 @@ import { isAtom } from '../formats/atoms.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
 import { frameworkOf, type Framework } from '../formats/frameworks.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
-import { isAbstract, nameOf } from '../graph/drawing.js';
+import { attackId, isAbstract, nameOf } from '../graph/drawing.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
 import { popup, popupStyles, type AttackShown } from './popup.js';
@@ -127,14 +127,14 @@ export class Arg2pFramework extends LitElement {
     private read(): void {
         this.declared = declaredFramework(this.theory);
         const solved = this.labelled === null ? { arguments: [], attacks: [] } : frameworkOf(this.labelled);
-        const declaredAttacks = new Set(this.declared.attacks.map(key));
+        const declaredAttacks = new Set(this.declared.attacks.map(it => attackId(it.from, it.to)));
         this.drawnArguments = [
             ...this.declared.arguments.map(it => ({ it, derived: false })),
             ...solved.arguments.filter(it => !this.declared.arguments.includes(it)).map(it => ({ it, derived: true })),
         ];
         this.drawnAttacks = [
             ...this.declared.attacks.map(it => ({ it, derived: false })),
-            ...solved.attacks.filter(it => !declaredAttacks.has(key(it))).map(it => ({ it, derived: true })),
+            ...solved.attacks.filter(it => !declaredAttacks.has(attackId(it.from, it.to))).map(it => ({ it, derived: true })),
         ];
         this.labels = new Map((this.labelled?.arguments ?? []).map(it => [nameOf(it, true), it.label]));
         if (this.source !== null && !this.drawnArguments.some(({ it }) => it === this.source)) this.source = null;
@@ -151,7 +151,7 @@ export class Arg2pFramework extends LitElement {
         }));
         const edges: Drawn[] = this.drawnAttacks.map(({ it, derived }) => ({
             group: 'edges',
-            data: { id: key(it), source: it.from, target: it.to, tone: tone(it.from) },
+            data: { id: attackId(it.from, it.to), source: it.from, target: it.to, tone: tone(it.from) },
             classes: derived ? 'derived' : '',
         }));
         this.canvas.draw([...nodes, ...edges]);
@@ -216,7 +216,7 @@ export class Arg2pFramework extends LitElement {
         const goneAttacks = new Set(cy.$('edge:selected').map(it => it.id()));
         this.change({
             arguments: this.declared.arguments.filter(it => !gone.has(it)),
-            attacks: this.declared.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(key(it))),
+            attacks: this.declared.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(attackId(it.from, it.to))),
         });
         this.selected = cy.$(':selected').nonempty();
     }
@@ -442,10 +442,6 @@ export class Arg2pFramework extends LitElement {
             }
         `,
     ];
-}
-
-function key(attack: { from: string; to: string }): string {
-    return `${attack.from}->${attack.to}`;
 }
 
 define('arg2p-framework', Arg2pFramework);

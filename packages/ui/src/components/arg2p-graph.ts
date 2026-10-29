@@ -2,7 +2,7 @@ import type { Core, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Solved } from '../engine.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
-import { attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
+import { attackId, attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
 import { levelsOf, supportsOf } from '../graph/levels.js';
 import type { Positions } from '../graph/positions.js';
@@ -121,7 +121,7 @@ export class Arg2pGraph extends LitElement {
         const edges: Drawn[] = [
             ...graph.attacks.map(it => ({
                 group: 'edges' as const,
-                data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, tone: labels.get(it.from) ?? 'na', curve: 0 },
+                data: { id: attackId(it.from, it.to), source: it.from, target: it.to, tone: labels.get(it.from) ?? 'na', curve: 0 },
                 classes: abstract ? 'attack' : 'attack layered',
             })),
             ...supports.map(it => ({
@@ -156,7 +156,7 @@ export class Arg2pGraph extends LitElement {
                 const from = positions.get(it.from);
                 const to = positions.get(it.to);
                 if (from === undefined || to === undefined) return;
-                cy.getElementById(`${it.from}->${it.to}`).data('curve', curveOf(from, to) * Math.hypot(to.x - from.x, to.y - from.y));
+                cy.getElementById(attackId(it.from, it.to)).data('curve', curveOf(from, to) * Math.hypot(to.x - from.x, to.y - from.y));
             });
         });
     }
