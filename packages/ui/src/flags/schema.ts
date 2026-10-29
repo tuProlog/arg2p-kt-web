@@ -173,6 +173,7 @@ export const FLAG_GROUPS: readonly FlagGroup[] = [
                     option('aspicLanguage', 'ASPIC+', 'Contraries well formed.'),
                     option('abaLanguage', 'ABA', 'Assumptions and contraries, flat, strict rules alone.'),
                     option('defeasibleLanguage', 'Defeasible', 'Defeasible rules alone.'),
+                    option('abstractLanguage', 'Abstract', 'Arguments and attacks alone, none of the notations of rules.'),
                 ],
                 help: 'What the theory is read and checked as, beyond the language of arg2p. The profile sets them.',
             },
