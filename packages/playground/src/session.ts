@@ -40,15 +40,19 @@ export class Session {
         this.workspace = this.stored();
     }
 
-    /** Keeps in step with the other pages of [target] (a window), and saves before the page goes away */
-    attach(target: Window): void {
-        target.addEventListener('pagehide', () => this.flush());
-        target.document.addEventListener('visibilitychange', () => {
-            if (target.document.hidden) this.flush();
-        });
-        target.addEventListener('storage', event => {
-            if (event.key === store.KEY) this.changedElsewhere();
-        });
+    /** Keeps in step with the other pages of [target] (a window), and saves before the page goes away: gives what stops it */
+    attach(target: Window): () => void {
+        const gone = () => this.flush();
+        const hidden = () => target.document.hidden && this.flush();
+        const stored = (event: StorageEvent) => event.key === store.KEY && this.changedElsewhere();
+        target.addEventListener('pagehide', gone);
+        target.document.addEventListener('visibilitychange', hidden);
+        target.addEventListener('storage', stored);
+        return () => {
+            target.removeEventListener('pagehide', gone);
+            target.document.removeEventListener('visibilitychange', hidden);
+            target.removeEventListener('storage', stored);
+        };
     }
 
     get current(): Workspace {

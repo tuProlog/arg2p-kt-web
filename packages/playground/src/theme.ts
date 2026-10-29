@@ -31,10 +31,11 @@ export function toggleTheme(): void {
     apply(theme);
 }
 
-/** Follows the system while no theme is picked */
-export function followSystem(): void {
+/** Follows the system while no theme is picked: gives what stops it */
+export function followSystem(): () => void {
     apply(currentTheme());
-    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', event => {
-        if (stored() === null) apply(event.matches ? 'dark' : 'light');
-    });
+    const system = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const changed = (event: MediaQueryListEvent) => stored() === null && apply(event.matches ? 'dark' : 'light');
+    system?.addEventListener('change', changed);
+    return () => system?.removeEventListener('change', changed);
 }

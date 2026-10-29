@@ -17,7 +17,7 @@ npm run build -w @tuprolog/arg2p-playground
 | `app.ts` | The page: the bar on top, the tabs of the documents, the theory, and its solver |
 | `documents.ts`, `session.ts` | The documents worked on, kept in the browser (`localStorage`, under `arg2p.workspace.2`; `arg2p.workspace`, of version 1, is only read once), in step with the other pages open |
 | `tabs.ts`, `layout.ts`, `share.ts`, `menus.ts` | The tabs of the documents, the dividers and the widths they keep, the dialog of a shared link, the menus |
-| `links.ts` | The links that share a theory, its query and its flags |
+| `links.ts`, `router.ts` | The links that share a theory, its query and its flags; the links the page is opened with, in the page or in the installed app: a shared one opens in a tab, one of a pairing in the *Federation* tab |
 | `federation/` | Parallel runs, and the federation with the playgrounds of other devices |
 
 ## The federation
@@ -28,10 +28,11 @@ npm run build -w @tuprolog/arg2p-playground
 | `cluster.ts` | The cluster, a `WebWorkerCluster` of `@tuprolog/arg2p` on Web Workers (`worker.ts`): loaded with the solver, apart from the page. It solves any goal, on the flags of the run, and tells what its federation is |
 | `engine.ts` | `ClusterEngine`, the engine of the parallel runs (the `Engine` of the ui) on the cluster |
 | `pairing.ts`, `relay.ts` | The pairing: an invitation as one QR code, its reply sealed (AES-GCM) through a ntfy relay (an https address) with a short code, or as a link. An invitation lasts 10 minutes, reads the relay while its page is shown, and pairs with no code two different replies came with |
-| `links.ts` | The links of a pairing (`#join=`, `#reply=`), followed as they are opened, in the page or in the installed app |
+| `links.ts` | The links of a pairing (`#join=`, `#reply=`), and the codes they carry |
 | `panel.ts`, `qr.ts` | The *Federation* tab, a tab of the solver, and its QR codes, drawn and scanned |
 
 ## Updates
 
 The service worker precaches the build, so that the playground is installable and works offline. A new version waits
-for the page: the page offers to load it, and warns while a run or a federation goes on, which loading would end.
+for the page: the page offers to load it, in a banner of its own, and warns while a run or a federation goes on, which
+loading would end. A page left open looks for a new version every hour.
