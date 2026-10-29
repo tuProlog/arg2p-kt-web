@@ -1,6 +1,7 @@
 import { deflateSync, strToU8 } from 'fflate';
 import { assert, describe, it } from 'vitest';
 import { toBase64url as base64url } from '../src/base64url.js';
+import { DEFAULT_QUERY } from '../src/documents.js';
 import { read, shareUrl } from '../src/links.js';
 
 const { deepEqual, equal } = assert;
@@ -79,7 +80,8 @@ describe('Links', function () {
         deepEqual(abstract, {
             content: {
                 theory: 'graphBuildMode(abstract).\n\na.\nb.\na -> b.\nb -> a.\n',
-                query: 'buildLabelSets(In, Out, Und)',
+                // a link of version 1 tells no query: the default one is solved
+                query: DEFAULT_QUERY,
                 flags: 'argumentLabellingMode(preferred).\n',
             },
             errors: [],
