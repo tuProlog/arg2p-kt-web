@@ -103,6 +103,7 @@ written by hand with the plain parameters below.
 | `flags` | The flags, as Prolog facts |
 | `arguments` | The arguments of an abstract framework, e.g. `a,b,c` |
 | `attacks` | Its attacks as `attacker-attacked`, e.g. `a-b,b-c` |
+| `mode` | `abstract` or `structured`, as in the links of the former playground: with `abstract`, the framework of `arguments` and `attacks` is opened rather than a `theory` |
 
 Every value is percent-encoded. A framework given by `arguments` and `attacks` becomes a theory of
 the profile `abstract`; arguments mentioned only in `attacks` are added, so
