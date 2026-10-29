@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import '../share.js';
 import { controls } from '../styles.js';
-import { workerCount, type Federation, type FederationStats } from './federation.js';
+import { deviceName, devicesOf, workerCount, type Federation, type FederationStats } from './federation.js';
 import { codeIn, followPairingLinks, type PairingKind, type PairingLink } from './links.js';
 import { DEFAULT_RELAY, decodeInvitation, decodeReply, messageOf, type Joined } from './pairing.js';
 import { qrSvg, scanQr } from './qr.js';
@@ -333,8 +333,6 @@ export class Arg2pFederation extends LitElement {
     private renderStats() {
         const stats = this.stats;
         if (stats === null) return html`<p class="hint">Not running: a parallel run, an invitation or a join starts it.</p>`;
-        const devices = stats.sites.filter(it => !it.delegate);
-        const name = (id: string) => (id === stats.site ? 'This device' : id);
         const evaluation = stats.evaluation;
         return html`
             <table>
@@ -345,11 +343,11 @@ export class Arg2pFederation extends LitElement {
                     <tr><th scope="col">Device</th><th scope="col">Workers</th><th scope="col">Linked</th></tr>
                 </thead>
                 <tbody>
-                    ${devices.map(
-                        it => html`<tr>
-                            <td>${name(it.id)}</td>
+                    ${devicesOf(stats).map(
+                        (it, i) => html`<tr>
+                            <td title=${it.id}>${it.name}</td>
                             <td>${it.workers ?? '—'}</td>
-                            <td>${it.id === stats.site ? '' : it.via === null ? 'directly' : `through ${name(it.via)}`}</td>
+                            <td>${i === 0 ? '' : it.via === null ? 'directly' : `through ${it.via}`}</td>
                         </tr>`,
                     )}
                 </tbody>
@@ -371,7 +369,7 @@ export class Arg2pFederation extends LitElement {
                           </thead>
                           <tbody>
                               ${evaluation.workers.map(
-                                  it => html`<tr><td>${it.partition}</td><td>${name(it.site)}</td><td>${it.arguments}</td><td>${it.attacks}</td></tr>`,
+                                  it => html`<tr><td>${it.partition}</td><td>${deviceName(stats, it.site)}</td><td>${it.arguments}</td><td>${it.attacks}</td></tr>`,
                               )}
                           </tbody>
                       </table>

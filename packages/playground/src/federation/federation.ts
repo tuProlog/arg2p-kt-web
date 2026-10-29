@@ -71,6 +71,36 @@ export interface Cluster extends Peer, ParallelSolver {
     close(): void;
 }
 
+/** A device of a federation, as the user reads it: this one, or another by its rank among those known */
+export interface Device {
+    readonly id: string;
+    readonly name: string;
+    /** Its workers, those of its Web Workers included: null when not known (a device reached through another) */
+    readonly workers: number | null;
+    /** The device it is reached through: null for this one, and those linked to it */
+    readonly via: string | null;
+}
+
+/** The devices of [stats]: this one first (its workers, on its Web Workers), then the others */
+export function devicesOf(stats: FederationStats): Device[] {
+    const delegates = stats.sites.filter(it => it.delegate);
+    const self = stats.sites.find(it => it.id === stats.site);
+    const own = (self?.workers ?? 0) + delegates.reduce((sum, it) => sum + (it.workers ?? 0), 0);
+    const others = stats.sites.filter(it => !it.delegate && it.id !== stats.site);
+    const name = (id: string) => deviceName(stats, id);
+    return [
+        { id: stats.site, name: name(stats.site), workers: own, via: null },
+        ...others.map(it => ({ id: it.id, name: name(it.id), workers: it.workers, via: it.via === null ? null : name(it.via) })),
+    ];
+}
+
+/** The device the site [id] of [stats] is on: this one for its Web Workers, another by its rank, or the site itself */
+export function deviceName(stats: FederationStats, id: string): string {
+    if (id === stats.site || stats.sites.some(it => it.delegate && it.id === id)) return 'This device';
+    const rank = stats.sites.filter(it => !it.delegate && it.id !== stats.site).findIndex(it => it.id === id);
+    return rank === -1 ? id : `Device ${rank + 1}`;
+}
+
 /** The Web Workers a cluster runs on this device: one less than its processors, at most 4 (a phone has little memory to spare) */
 export function workerCount(): number {
     return Math.max(1, Math.min(4, (globalThis.navigator?.hardwareConcurrency ?? 2) - 1));

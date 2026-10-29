@@ -1,6 +1,7 @@
 import jsQR from 'jsqr';
 import { encode } from 'uqr';
 import { assert, describe, it } from 'vitest';
+import { deviceName, devicesOf, type FederationStats } from '../src/federation/federation.js';
 import { codeIn, pairingLink, readPairing } from '../src/federation/links.js';
 
 const { deepEqual, equal } = assert;
@@ -49,5 +50,34 @@ describe('The links of a pairing', function () {
         // some 100 modules a side, which a phone reads off a screen
         assert.isAtMost(qr.version, 21, `version ${qr.version}`);
         assert.notInclude(link, '%', 'the code as it is in the link');
+    });
+});
+
+describe('The devices of a federation', function () {
+    // as a cluster paired with another tells them: its own site, its Web Workers, the other device, and one beyond it
+    const stats: FederationStats = {
+        site: 'site-a',
+        sites: [
+            { id: 'site-a', workers: 0, delegate: false, via: null },
+            { id: 'site-a1', workers: 1, delegate: true, via: null },
+            { id: 'site-a2', workers: 1, delegate: true, via: null },
+            { id: 'site-b', workers: 4, delegate: false, via: null },
+            { id: 'site-c', workers: null, delegate: false, via: 'site-b' },
+        ],
+        evaluation: null,
+    };
+
+    it('should tell this device first, with the workers of its Web Workers, then the others', function () {
+        deepEqual(devicesOf(stats), [
+            { id: 'site-a', name: 'This device', workers: 2, via: null },
+            { id: 'site-b', name: 'Device 1', workers: 4, via: null },
+            { id: 'site-c', name: 'Device 2', workers: null, via: 'Device 1' },
+        ]);
+    });
+
+    it('should tell the device a worker ran on', function () {
+        equal(deviceName(stats, 'site-a2'), 'This device');
+        equal(deviceName(stats, 'site-b'), 'Device 1');
+        equal(deviceName(stats, 'site-x'), 'site-x');
     });
 });
