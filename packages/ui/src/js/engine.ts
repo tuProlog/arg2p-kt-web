@@ -16,7 +16,16 @@ export interface Channel {
 interface Waiting {
     resolve(answer: Answer): void;
     reject(error: EngineError): void;
+    // what was asked: a check or the settings are asked again of a fresh worker
+    readonly request: Request;
 }
+
+// The answers a query is waited for with, by the start of their keys: a stop fails them, and them alone
+const RUN_KEYS = ['start:', 'next:', 'graph:'];
+const isRun = (key: string) => RUN_KEYS.some(it => key.startsWith(it));
+
+const STOPPED: EngineError = { name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true };
+const GONE: EngineError = { name: 'Error', message: 'This query is no longer running.', syntax: null };
 
 // The worker of this module, as bundlers (Vite, webpack) find it
 const spawnWorker = (): Channel =>
@@ -25,7 +34,8 @@ const spawnWorker = (): Channel =>
 /**
  * The engine of the browser: the solver of @tuprolog/arg2p in a worker (see host for the messages), so that the page
  * stays responsive while it works. Stopping an evaluation ends the worker (the only way to interrupt it) and starts a
- * fresh one, which warms itself up in the background.
+ * fresh one, which warms itself up in the background: the checks of the texts and the settings asked of the worker
+ * ended are asked again of the fresh one.
  */
 export class JsEngine implements Engine {
     private channel: Channel | null = null;
@@ -62,11 +72,14 @@ export class JsEngine implements Engine {
                         hasNext = solution.hasNext;
                         return solution.solution;
                     }),
+                // the stages of a query replaced, or stopped, are gone with it: none is read as empty
                 graphAt: (branch: number): Promise<GraphData> => {
+                    if (this.current !== id) return Promise.reject(GONE);
                     const reqId = ++this.sequence;
-                    return this.request({ type: 'graphAt', id, branch, reqId }, `graph:${reqId}`).then(
-                        answer => (answer as Extract<Answer, { type: 'graph' }>).graph,
-                    );
+                    return this.request({ type: 'graphAt', id, branch, reqId }, `graph:${reqId}`).then(answer => {
+                        if (this.current !== id) throw GONE;
+                        return (answer as Extract<Answer, { type: 'graph' }>).graph;
+                    });
                 },
             };
         });
@@ -88,9 +101,11 @@ export class JsEngine implements Engine {
 
     stop(): void {
         // nothing is being evaluated: the worker is let be
-        if (this.pending.size === 0) return;
-        this.failAll({ name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true });
+        if (![...this.pending.keys()].some(isRun)) return;
+        this.fail(STOPPED, isRun);
         this.restart();
+        // the checks and the settings asked of the worker ended are asked again of the fresh one, in the order they were
+        [...this.pending.values()].flat().forEach(it => this.channel!.postMessage(it.request));
     }
 
     private open(): void {
@@ -103,7 +118,7 @@ export class JsEngine implements Engine {
             channel.onerror = event => {
                 event.preventDefault();
                 if (this.channel !== channel) return;
-                this.failAll({ name: 'Solver error', message: event.message || 'The solver stopped working.', syntax: null });
+                this.fail({ name: 'Solver error', message: event.message || 'The solver stopped working.', syntax: null });
                 this.restart();
             };
         }
@@ -144,14 +159,16 @@ export class JsEngine implements Engine {
     private request(request: Request, key: string): Promise<Answer> {
         if (this.channel === null) this.open();
         return new Promise((resolve, reject) => {
-            this.pending.set(key, [...(this.pending.get(key) ?? []), { resolve, reject }]);
+            this.pending.set(key, [...(this.pending.get(key) ?? []), { resolve, reject, request }]);
             this.channel!.postMessage(request);
         });
     }
 
-    private failAll(error: EngineError): void {
-        const waiting = [...this.pending.values()].flat();
-        this.pending.clear();
+    // What is waited for, by the keys [which] picks (all of it, by default), failed with [error]
+    private fail(error: EngineError, which: (key: string) => boolean = () => true): void {
+        const keys = [...this.pending.keys()].filter(which);
+        const waiting = keys.flatMap(key => this.pending.get(key)!);
+        keys.forEach(key => this.pending.delete(key));
         waiting.forEach(it => it.reject(error));
     }
 }
