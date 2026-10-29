@@ -87,7 +87,7 @@
     "lit": "3.3.3"
   },
   "devDependencies": {
-    "@tuprolog/arg2p": "0.21.0",
+    "@tuprolog/arg2p": "0.21.1",
     "happy-dom": "21.0.4",
     "typescript": "7.0.2",
     "vite": "8.3.5",
