@@ -27,7 +27,7 @@ npm run build -w @tuprolog/arg2p-playground
 | `federation.ts` | The federation of the page: its cluster, started once asked for, its pairing, and what it is |
 | `cluster.ts` | The cluster, a `WebWorkerCluster` of `@tuprolog/arg2p` on Web Workers (`worker.ts`): loaded with the solver, apart from the page. It solves any goal, on the flags of the run, and tells what its federation is |
 | `engine.ts` | `ClusterEngine`, the engine of the parallel runs (the `Engine` of the ui) on the cluster |
-| `pairing.ts`, `relay.ts` | The pairing: an invitation as one QR code, its reply sealed (AES-GCM) through a ntfy relay with a short code, or as a link |
+| `pairing.ts`, `relay.ts` | The pairing: an invitation as one QR code, its reply sealed (AES-GCM) through a ntfy relay (an https address) with a short code, or as a link. An invitation lasts 10 minutes, reads the relay while its page is shown, and pairs with no code two different replies came with |
 | `links.ts` | The links of a pairing (`#join=`, `#reply=`), followed as they are opened, in the page or in the installed app |
 | `panel.ts`, `qr.ts` | The *Federation* tab, a tab of the solver, and its QR codes, drawn and scanned |
 

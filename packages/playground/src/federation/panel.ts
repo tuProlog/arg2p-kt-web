@@ -3,10 +3,12 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { messageOf } from '../errors.js';
 import '../share.js';
 import { controls } from '../styles.js';
-import { deviceName, devicesOf, workerCount, type Federation, type FederationStats } from './federation.js';
-import { codeIn, followPairingLinks, type PairingKind, type PairingLink } from './links.js';
-import { DEFAULT_RELAY, decodeInvitation, decodeReply, type Joined } from './pairing.js';
+import { deviceName, devicesOf, workerCount, type Federation, type FederationEvent, type FederationStats } from './federation.js';
+import { codeIn, type PairingKind, type PairingLink } from './links.js';
+import { DEFAULT_RELAY, INVITATION_LIFETIME, decodeInvitation, decodeReply, type Joined } from './pairing.js';
 import { qrSvg, scanQr } from './qr.js';
+
+const PAIRED = 'Paired: the devices lend each other their workers, and parallel runs use them.';
 
 /** Where a pairing is, as this device shows it */
 type Step =
@@ -22,10 +24,15 @@ type Step =
     // waiting: for an invitation, for a reply, for the pairing to complete
     | { kind: 'waiting'; text: string; back: Step };
 
+// Whether [step] shows the invitation going on, or waits for its pairing: the invitation is dropped once none does
+function showsInvitation(step: Step): boolean {
+    return step.kind === 'inviting' || (step.kind === 'waiting' && showsInvitation(step.back));
+}
+
 /**
  * The federation of the playground with the playgrounds of other devices: the pairing (see pairing.ts), the devices
- * paired, and what the last parallel run did. A link of a pairing opened in the page comes here: the panel asks to be
- * shown (`arg2p-reveal`).
+ * paired, and what the last parallel run did. A link of a pairing opened in the page comes here (`open`): the panel
+ * asks to be shown (`arg2p-reveal`).
  */
 export class Arg2pFederation extends LitElement {
     static override properties = {
@@ -51,9 +58,10 @@ export class Arg2pFederation extends LitElement {
     private stats: FederationStats | null = null;
     // the step an answer was waited in: one that comes after another step is let go
     private attempt = 0;
+    // what is waited for, aborted once the step changes (cancelled, say)
+    private task: AbortController | null = null;
     private scan: AbortController | null = null;
     private unsubscribe: (() => void) | null = null;
-    private unfollow: (() => void) | null = null;
 
     // shown no longer: the camera is let go
     static override get observedAttributes(): string[] {
@@ -67,13 +75,11 @@ export class Arg2pFederation extends LitElement {
 
     override connectedCallback(): void {
         super.connectedCallback();
-        this.unfollow = followPairingLinks(window, link => void this.opened(link));
         document.addEventListener('visibilitychange', this.pageHidden);
     }
 
     override disconnectedCallback(): void {
         super.disconnectedCallback();
-        this.unfollow?.();
         this.unsubscribe?.();
         this.unsubscribe = null;
         document.removeEventListener('visibilitychange', this.pageHidden);
@@ -84,13 +90,38 @@ export class Arg2pFederation extends LitElement {
         if (changed.has('federation')) {
             this.unsubscribe?.();
             const federation = this.federation;
-            this.unsubscribe =
-                federation?.subscribe(() => {
-                    this.stats = federation.stats;
-                    // paired by a reply opened in another page of this device
-                    if (this.step.kind === 'inviting' && !federation.inviting) this.paired();
-                }) ?? null;
+            this.unsubscribe = federation?.subscribe(event => this.told(federation, event)) ?? null;
             this.stats = federation?.stats ?? null;
+        }
+    }
+
+    /**
+     * Opens [link], a link of a pairing opened in the page: an invitation is joined once confirmed, a reply taken by the
+     * invitation of this page, or else handed to the page of this device that invited. The page is asked to show the
+     * panel, once it is drawn.
+     */
+    async open(link: PairingLink): Promise<void> {
+        await this.updateComplete;
+        this.dispatchEvent(new CustomEvent('arg2p-reveal', { bubbles: true, composed: true }));
+        if (link.kind === 'join') {
+            this.go({ kind: 'confirm', code: link.code });
+            this.tell(null);
+        } else if (this.federation?.inviting) {
+            void this.take(link.code, this.step);
+        } else {
+            void this.handOff(link.code);
+        }
+    }
+
+    // What [federation] tells: a device paired ends the pairing shown, an invitation ended by itself is shown no longer
+    private told(federation: Federation, event: FederationEvent): void {
+        this.stats = federation.stats;
+        if (event === 'paired') {
+            if (this.step.kind === 'confirm' || this.step.kind === 'joining') this.tell(PAIRED);
+            else this.paired();
+        } else if (event === 'dropped' && this.step.kind === 'inviting') {
+            this.go({ kind: 'idle' });
+            this.tell(`The invitation ended (it lasts ${INVITATION_LIFETIME / 60_000} minutes, and ends with its page): invite again.`, true);
         }
     }
 
@@ -102,21 +133,12 @@ export class Arg2pFederation extends LitElement {
         if (document.hidden) this.cancelScan();
     };
 
-    // A link of a pairing opened here: an invitation is joined once confirmed, a reply handed to the page that invited.
-    // The page is asked to show the panel once it is drawn (the link of the page comes as it draws it).
-    private async opened(link: PairingLink): Promise<void> {
-        await this.updateComplete;
-        this.dispatchEvent(new CustomEvent('arg2p-reveal', { bubbles: true, composed: true }));
-        if (link.kind === 'join') {
-            this.go({ kind: 'confirm', code: link.code });
-            this.tell(null);
-        } else {
-            void this.handOff(link.code);
-        }
-    }
-
+    // Another step: what the one before waited for is aborted, and the invitation dropped once it is shown no longer
     private go(step: Step): number {
         this.cancelScan();
+        this.task?.abort();
+        this.task = null;
+        if (!showsInvitation(step)) this.federation?.dropInvitation();
         this.step = step;
         this.pasted = '';
         return ++this.attempt;
@@ -126,19 +148,22 @@ export class Arg2pFederation extends LitElement {
         this.message = text === null ? null : { text, error };
     }
 
-    // What [task] gives, in a step of waiting that tells [text] and goes back to [back] when cancelled; null when it
-    // was cancelled, or failed (told)
-    private async wait<T>(text: string, back: Step, task: (federation: Federation) => Promise<T>): Promise<T | null> {
+    // What [task] gives, in a step of waiting that tells [text] and goes back to [back] when cancelled (its signal
+    // aborted then); null when it was cancelled, or failed (told). A step showing an invitation that ended is gone back
+    // to no longer.
+    private async wait<T>(text: string, back: Step, task: (federation: Federation, signal: AbortSignal) => Promise<T>): Promise<T | null> {
         const federation = this.federation;
         if (federation === null) return null;
         const attempt = this.go({ kind: 'waiting', text, back });
+        const controller = new AbortController();
+        this.task = controller;
         this.tell(null);
         try {
-            const result = await task(federation);
+            const result = await task(federation, controller.signal);
             return attempt === this.attempt ? result : null;
         } catch (error) {
             if (attempt === this.attempt) {
-                this.go(back);
+                this.go(showsInvitation(back) && !federation.inviting ? { kind: 'idle' } : back);
                 this.tell(messageOf(error), true);
             }
             return null;
@@ -153,34 +178,40 @@ export class Arg2pFederation extends LitElement {
         if (link !== null) this.go({ kind: 'inviting', link });
     }
 
-    // The code the other device shows, typed: its reply, once the relay brings it
+    // The code the other device shows, typed: its reply, once the relay brings it (the federation tells it paired)
     private async pair(back: Step): Promise<void> {
         const code = this.typed;
         if (code.trim() === '') return;
-        const done = await this.wait('Pairing…', back, federation => federation.pair(code).then(() => true));
-        if (done) this.paired();
+        await this.wait('Pairing…', back, federation => federation.pair(code));
     }
 
-    // A reply scanned or pasted on this device
+    // A reply scanned, pasted or opened on this device (the federation tells it paired)
     private async take(text: string, back: Step): Promise<void> {
         const code = codeIn(text, 'reply');
         if (code === null) return this.tell('That is not the reply to an invitation.', true);
-        const done = await this.wait('Pairing…', back, federation => federation.take(code).then(() => true));
-        if (done) this.paired();
+        await this.wait('Pairing…', back, federation => federation.take(code));
     }
 
     private paired(): void {
         this.go({ kind: 'idle' });
         this.typed = '';
-        this.tell('Paired: the devices lend each other their workers, and parallel runs use them.');
+        this.tell(PAIRED);
     }
 
-    // An invitation scanned, pasted or opened here, confirmed
+    // An invitation scanned, pasted or opened here, confirmed: cancelled, it sends the device that invited no reply
     private async join(text: string): Promise<void> {
         const code = codeIn(text, 'join');
         if (code === null) return this.tell('That is not an invitation.', true);
-        const joined = await this.wait('Accepting the invitation…', { kind: 'idle' }, federation => federation.join(code, location.href));
+        const joined = await this.wait('Accepting the invitation…', { kind: 'idle' }, (federation, signal) => federation.join(code, location.href, signal));
         if (joined !== null) this.go({ kind: 'joined', joined });
+    }
+
+    // The relay typed: an https address, or none for the default one
+    private setRelay(input: HTMLInputElement): void {
+        if (this.federation === null) return;
+        if (this.federation.setRelay(input.value)) return this.tell(null);
+        this.tell(`The relay must be an https address, as ${DEFAULT_RELAY}.`, true);
+        input.value = this.federation.relay;
     }
 
     private async handOff(code: string): Promise<void> {
@@ -388,7 +419,7 @@ export class Arg2pFederation extends LitElement {
                 theories the others send it: pair only with devices you trust.
             </p>
             <div class="row">
-                <button type="button" class="primary" @click=${() => this.invite()}>Invite a device</button>
+                <button type="button" class="primary" ?disabled=${this.step.kind === 'waiting'} @click=${() => this.invite()}>Invite a device</button>
                 <button type="button" @click=${() => (this.go({ kind: 'joining' }), this.tell(null))}>Join a device</button>
                 <span class="status" role="status">${others > 0 ? `Paired with ${others} ${others === 1 ? 'device' : 'devices'}` : running ? 'Not paired' : ''}</span>
                 ${running ? html`<button type="button" class="link" @click=${() => this.leave()}>Leave</button>` : nothing}
@@ -410,7 +441,7 @@ export class Arg2pFederation extends LitElement {
                     aria-label="The relay"
                     placeholder=${DEFAULT_RELAY}
                     .value=${this.federation?.relay ?? DEFAULT_RELAY}
-                    @change=${(e: Event) => this.federation && (this.federation.relay = (e.target as HTMLInputElement).value)}
+                    @change=${(e: Event) => this.setRelay(e.target as HTMLInputElement)}
                 />
             </details>
         `;
