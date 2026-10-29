@@ -43,11 +43,7 @@ iOS) and then works offline, on desktops, tablets and phones.
   npm run build
 ```
 
-- Deploy the playground to GitHub Pages
-
-```bash
-  npm run deploy -w @tuprolog/arg2p-playground
-```
+The playground is deployed to GitHub Pages by the CI, from `master`, once its tests pass.
 
 ## Theories and profiles
 
