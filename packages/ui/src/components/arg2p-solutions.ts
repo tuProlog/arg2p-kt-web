@@ -1,8 +1,9 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { EngineError, Run, SolutionData, Solved } from '../engine.js';
+import { emit } from '../events.js';
 import { listItems } from '../formats/terms.js';
 import { tokens } from '../theme.js';
-import { activate, buttons, chip, chips, define, emit } from './shared.js';
+import { activate, buttons, chip, chips, define } from './shared.js';
 
 // Bindings named after a label (In, Out, Und) hold sets of arguments or statements: shown as chips coloured like the
 // graph

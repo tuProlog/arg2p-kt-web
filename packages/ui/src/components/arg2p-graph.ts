@@ -1,6 +1,7 @@
 import type { Core, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Solved } from '../engine.js';
+import { emit } from '../events.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
 import { attackId, attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
@@ -8,7 +9,7 @@ import { levelsOf, supportsOf } from '../graph/levels.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
 import { popup, popupStyles, type ArgumentShown, type Named } from './popup.js';
-import { buttons, chips, define, emit } from './shared.js';
+import { buttons, chips, define } from './shared.js';
 
 // The layout keeps nodes this far apart, edge to edge, and rows at least LEVEL_SEPARATION apart
 const NODE_GAP = 40;

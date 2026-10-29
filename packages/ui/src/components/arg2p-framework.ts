@@ -1,6 +1,7 @@
 import type { Core, EventObject, StylesheetJson } from 'cytoscape';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
+import { emit } from '../events.js';
 import { isAtom } from '../formats/atoms.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
 import { frameworkOf, type Framework } from '../formats/frameworks.js';
@@ -9,7 +10,7 @@ import { attackId, isAbstract, nameOf } from '../graph/drawing.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
 import { popup, popupStyles, type AttackShown } from './popup.js';
-import { buttons, chips, define, emit } from './shared.js';
+import { buttons, chips, define } from './shared.js';
 
 type Mode = 'select' | 'argument' | 'attack';
 

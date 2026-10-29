@@ -1,9 +1,10 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine } from '../engine.js';
+import { emit } from '../events.js';
 import { DEFAULTS, FLAG_GROUPS, FLAGS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
 import { profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
 import { tokens } from '../theme.js';
-import { define, emit } from './shared.js';
+import { define } from './shared.js';
 
 // How long the flags and the theory are let be before the engine is asked what is in effect
 const SETTLE = 250;

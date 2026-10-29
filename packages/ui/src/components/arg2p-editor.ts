@@ -8,8 +8,9 @@ import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { arg2p } from '../editor/language.js';
 import { keepView, rangeOf } from '../editor/view.js';
 import type { Engine, SyntaxProblem } from '../engine.js';
+import { emit } from '../events.js';
 import { tokens } from '../theme.js';
-import { activate, define, emit } from './shared.js';
+import { activate, define } from './shared.js';
 
 // How long the typing is let be before the text is checked
 const CHECK_DELAY = 500;

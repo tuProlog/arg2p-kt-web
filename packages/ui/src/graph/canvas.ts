@@ -1,6 +1,6 @@
 import cytoscape, { type Core, type EventObject, type StylesheetJson } from 'cytoscape';
 import type { LitElement, ReactiveController } from 'lit';
-import { emit } from '../components/shared.js';
+import { emit } from '../events.js';
 import { cssColor, labelColor } from '../theme.js';
 import { MUTUAL_STYLE, markMutual, placeByName, placesAll, positionsOf, type Positions } from './positions.js';
 
@@ -277,8 +277,7 @@ export class Canvas implements ReactiveController {
     export(name: string): void {
         const fileName = `${name}.png`;
         const dataUrl = this.png();
-        const event = new CustomEvent('arg2p-export', { detail: { fileName, dataUrl }, bubbles: true, composed: true, cancelable: true });
-        if (!this.host.dispatchEvent(event)) return;
+        if (!emit(this.host, 'arg2p-export', { fileName, dataUrl }, true)) return;
         const link = document.createElement('a');
         link.href = dataUrl;
         link.download = fileName;

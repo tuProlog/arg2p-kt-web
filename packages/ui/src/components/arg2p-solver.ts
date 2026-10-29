@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine, EngineError, SolveRequest, Solved } from '../engine.js';
+import { emit } from '../events.js';
 import { profileInfo } from '../flags/schema.js';
 import { profileOf } from '../flags/text.js';
 import type { Positions } from '../graph/positions.js';
@@ -13,7 +14,7 @@ import './arg2p-graph.js';
 import type { Arg2pGraph } from './arg2p-graph.js';
 import './arg2p-solutions.js';
 import type { Arg2pSolutions } from './arg2p-solutions.js';
-import { buttons, define, emit } from './shared.js';
+import { buttons, define } from './shared.js';
 
 /** The tabs of the solver itself; those of the page are named by the ids of their elements */
 type Panel = 'results' | 'theory' | 'flags' | 'console';
