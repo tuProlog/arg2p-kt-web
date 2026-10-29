@@ -201,6 +201,51 @@ describe('<arg2p-solver>', function () {
         equal(element.shadowRoot!.querySelector('.notice'), null);
     });
 
+    it('should let go a run replaced while it starts: stopped once, what it answers late dropped', async function () {
+        const engine = new Fake([yes()], null, true);
+        // a stop that fails nothing: the run replaced answers late
+        engine.stop = () => void engine.stops++;
+        const { element, events, find } = await solver(engine);
+        const first = element.run();
+        await settled();
+        const second = element.run();
+        await settled();
+        equal(engine.stops, 1);
+        // the starts, then the first solution of the run that replaced the other
+        engine.go();
+        await settled();
+        engine.go();
+        await Promise.all([first, second]);
+        await settled();
+        await element.updateComplete;
+        equal(engine.requests.length, 2);
+        equal(events.filter(it => it.type === 'arg2p-run').length, 2);
+        const cards = find<HTMLElement>('arg2p-solutions').shadowRoot!.querySelectorAll('.solution');
+        equal(cards.length, 1);
+        ok(cards[0].textContent!.includes('Solution 1'));
+        equal(events.some(it => it.type === 'arg2p-error'), false);
+        equal(element.busy, false);
+        equal(engine.stops, 1);
+    });
+
+    it('should stop a run under way once taken out of the page', async function () {
+        const engine = new Fake([yes()], null, true);
+        const { element } = await solver(engine);
+        const running = element.run();
+        await settled();
+        ok(element.busy);
+        element.remove();
+        equal(engine.stops, 1);
+        equal(element.busy, false);
+        await running;
+        // one done is left as it is
+        const done = new Fake([yes()]);
+        const again = await solver(done);
+        await again.element.run();
+        again.element.remove();
+        equal(done.stops, 0);
+    });
+
     it('should leave the engine be when it is cleared with nothing running', async function () {
         const engine = new Fake([yes()]);
         const { element } = await solver(engine);
@@ -313,6 +358,38 @@ describe('<arg2p-solver>', function () {
         element.tab = 'none';
         await element.updateComplete;
         equal(find<HTMLElement>('.panel.results').hidden, false);
+    });
+
+    it('should be tabs as WAI-ARIA has them: each with its panel, picked with the arrows', async function () {
+        const { element, events, find, root } = await solver(new Fake([]), it => {
+            it.innerHTML = '<div slot="tab" id="mine" label="Mine">mine</div>';
+        });
+        const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[role=tab]')];
+        deepEqual(
+            tabs().map(it => it.getAttribute('aria-controls')),
+            ['panel-results', 'panel-flags', 'panel-console', 'panel-hosted'],
+        );
+        equal(find('#panel-flags').getAttribute('aria-labelledby'), 'tab-flags');
+        equal(element.querySelector('#mine')!.getAttribute('aria-label'), 'Mine');
+        // the tab picked alone is reached with Tab
+        deepEqual(tabs().map(it => it.tabIndex), [0, -1, -1, -1]);
+        const key = (key: string) => root.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, composed: true }));
+        tabs()[0].focus();
+        key('ArrowRight');
+        await element.updateComplete;
+        equal(element.tab, 'flags');
+        equal(root.activeElement, tabs()[1]);
+        deepEqual(tabs().map(it => it.tabIndex), [-1, 0, -1, -1]);
+        key('End');
+        await element.updateComplete;
+        equal(element.tab, 'mine');
+        key('ArrowRight');
+        await element.updateComplete;
+        equal(element.tab, 'results');
+        key('ArrowLeft');
+        await element.updateComplete;
+        equal(element.tab, 'mine');
+        deepEqual(events.filter(it => it.type === 'arg2p-tab-change').map(it => it.detail.tab), ['flags', 'mine', 'results', 'mine']);
     });
 
     it('should share the places of the arguments between the graph and the drawing', async function () {

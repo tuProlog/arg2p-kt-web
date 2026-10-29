@@ -75,7 +75,7 @@ export interface Run {
     readonly query: string;
     hasNext(): boolean;
     next(): Promise<SolutionData>;
-    /** The graph of the stage [branch] of the computation */
+    /** The graph of the stage [branch] of the computation: none once the run is replaced, or stopped (it fails) */
     graphAt(branch: number): Promise<GraphData>;
 }
 
@@ -97,7 +97,10 @@ export interface Engine {
      * theory does not parse)
      */
     settings(theory: string, flags: string): Promise<Settings>;
-    /** Stops the evaluation going on: what it was waited for fails, as stopped */
+    /**
+     * Stops the evaluation going on: what its query was waited for fails, as stopped; the checks and the settings
+     * asked meanwhile are answered still
+     */
     stop(): void;
 }
 

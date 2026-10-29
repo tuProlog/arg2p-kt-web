@@ -46,7 +46,7 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | Method | |
 | --- | --- |
 | `run(): Promise<void>` | Solves the query: the results before are let go, and a run under way stopped |
-| `stop()` | Stops the run under way: what it was computing fails, as stopped |
+| `stop()` | Stops the run under way, if any: what it was computing fails, as stopped (a solver taken out of the page stops it too, and lets it go) |
 | `clear()` | Forgets the results, and where the arguments were drawn (another theory is shown), stopping a run under way |
 | `reveal(error: EngineError)` | Takes to where the error does not parse: the query, the flags, the theory in its tab, or else tells the page |
 | `fit()` | Fits the graph and the drawing to their room (after the page resized it) |
@@ -95,8 +95,10 @@ gives plain data, as it crosses a worker or a process.
 `JsEngine` (`@tuprolog/arg2p-ui/js`) is the solver of @tuprolog/arg2p in a worker of its own, so that the page stays
 responsive while it works: `start()` starts the worker, and its warm-up, ahead of the first evaluation (the first one
 is much slower than the next ones); `stop()` ends the worker, the only way to interrupt an evaluation, and starts a
-fresh one (nothing is ended when nothing is being evaluated). A query has no more solutions once its worker is ended,
-or once another query is solved.
+fresh one: what the query was waited for fails, as stopped (`error.stopped`), and the checks of the texts and the
+settings asked meanwhile are asked again of the fresh worker (nothing is ended when no query is being evaluated). A
+query has no more solutions, nor stages to read (`graphAt` fails), once its worker is ended, or once another query is
+solved.
 
 The worker is a `Channel`: a constructor argument gives another one that answers its messages (see `Request` and
 `Answer`), a bridge to a language server say, as the extension of VS Code does.
@@ -184,11 +186,29 @@ framework.addEventListener('arg2p-positions', share);
 | --- | --- |
 | `@tuprolog/arg2p-ui` | Every component, and what they are built on |
 | `@tuprolog/arg2p-ui/solver`, `/graph`, `/framework`, `/solutions`, `/editor`, `/flags` | One component alone (the solver with those it is made of) |
-| `@tuprolog/arg2p-ui/solver.bundle` | The solver in one file, its dependencies within: for a page with no bundler, loading it from a CDN as it is (`https://cdn.jsdelivr.net/npm/@tuprolog/arg2p-ui@<version>/dist/bundle/solver.js`) |
-| `@tuprolog/arg2p-ui/data` | What the components are built on, with no DOM: the contract of engines, the flags and profiles, the formats of abstract frameworks (APX, TGF, ICCMA'23), the layout of graphs |
+| `@tuprolog/arg2p-ui/solver.bundle` | The solver in one file, its dependencies within (CodeMirror, Lit, Cytoscape), for a page that loads it from a CDN as it is (`https://cdn.jsdelivr.net/npm/@tuprolog/arg2p-ui@<version>/dist/bundle/solver.js`): with an engine of the page's own (see below) |
+| `@tuprolog/arg2p-ui/data` | What the components are built on, with no DOM: the contract of engines, the flags and profiles, the formats of abstract frameworks (APX, TGF, ICCMA'23) |
 | `@tuprolog/arg2p-ui/js` | The engine of the browser: it brings the solver with it; and `graphData`, a graph of @tuprolog/arg2p (of a cluster of its parallel solver, say) as the components read it |
 
 A component is defined once: a page with two copies of the package keeps the first.
+
+The bundle has no engine. `JsEngine` cannot run from a CDN: it starts its worker from a module of its own, which a page
+cannot load as a worker from another origin, and the worker imports @tuprolog/arg2p by name. A page that loads the
+bundle gives the solver an engine of its own: a `JsEngine` on a `Channel` of the page (a bridge to a server, say), or an
+engine that replays answers recorded beforehand.
+
+`@tuprolog/arg2p-ui/data` exports too, for the drawings, `layeredLayout`, `levelsOf`, `supportsOf`, `nameOf`,
+`isAbstract` and `redrawn`: they are internal, no part of the API, and may change in any version.
+
+### What else the root exports
+
+| | |
+| --- | --- |
+| `tokens` | The custom properties of the theme (`--arg2p-*`, see below) as the style of a Lit component: on its host, `--_<name>` for each, with the values of the light theme |
+| `labelColor(element, label)` | The colour of a label (`in`, `out`, `und`; any other is unlabelled) as `element`, a component, is styled: for what draws on a canvas |
+| `arg2p()`, `arg2pLanguage` | The language of Arg2P for CodeMirror 6 (Prolog, with the arrows of its rules and of abstract frameworks): `arg2p()` with its colours (the tokens of the theme, in a component styled with `tokens`), `arg2pLanguage` alone |
+| `EditorKind` | The type of the texts `<arg2p-editor>` edits: `theory`, `query`, `flags` |
+| `Source` | The type of where the value of a flag in effect comes from, in `<arg2p-flags>`: `theory`, `flags`, `profile`, `default` |
 
 ## Theming
 
@@ -201,10 +221,13 @@ a light theme otherwise:
 | `--arg2p-hover`, `--arg2p-border` | What is hovered, and the borders |
 | `--arg2p-text`, `--arg2p-muted` | The text, and what is said aside |
 | `--arg2p-accent`, `--arg2p-error`, `--arg2p-no` | What stands out: the active, the errors, the solutions that are no |
-| `--arg2p-in`, `--arg2p-out`, `--arg2p-und`, `--arg2p-unlabelled` | The labels of the arguments (the same in every theme: they carry meaning) |
+| `--arg2p-in`, `--arg2p-out`, `--arg2p-und`, `--arg2p-unlabelled` | The labels of the arguments (the same in every theme: they carry meaning, and white is written on them) |
 | `--arg2p-support` | The supports between arguments |
 | `--arg2p-atom`, `--arg2p-functor`, `--arg2p-variable`, `--arg2p-comment` | The highlighting of the editors |
 | `--arg2p-font`, `--arg2p-mono` | The fonts, of the text and of the code |
+
+What is written on the accent and on the error (a badge, the Run button) takes the colour of the surface: the accent
+and the error stand out on the surface, as text does on it (WCAG AA asks 4.5:1).
 
 A dark theme, say:
 

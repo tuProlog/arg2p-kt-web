@@ -194,6 +194,17 @@ describe('<arg2p-graph>', function () {
         ok(graph.shadowRoot!.querySelector('.popup')!.textContent!.includes('flies(tweety)'));
     });
 
+    it('should draw nothing while out of a page, and what it was given once put back', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        graph.remove();
+        graph.solution = shown(GRAPH);
+        await graph.updateComplete;
+        equal(drawingOf(graph), null);
+        document.body.appendChild(graph);
+        await graph.updateComplete;
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.id()).sort(), ['A0', 'A1', 'A2']);
+    });
+
     it('should colour the arguments by their labels, in the colours the page sets once restyled', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
         graph.solution = shown(GRAPH);
@@ -268,6 +279,29 @@ describe('<arg2p-solutions>', function () {
         deepEqual(picked, [error]);
     });
 
+    it('should be picked with buttons, and tell readers of the screen what it is doing in a region there all along', async function () {
+        const solutions = await element<Arg2pSolutions>('arg2p-solutions');
+        const live = () => solutions.shadowRoot!.querySelector('[role=status]');
+        ok(live());
+        let release = () => {};
+        const held: Run = { ...run([solution('yes'), solution('yes')]), next: () => new Promise(resolve => (release = () => resolve(solution('yes')))) };
+        const first = solutions.start(held);
+        await solutions.updateComplete;
+        equal(live()!.textContent, 'Solving…');
+        release();
+        await first;
+        await solutions.updateComplete;
+        equal(live()!.textContent, '');
+        const pick = solutions.shadowRoot!.querySelector<HTMLButtonElement>('.solution .pick')!;
+        equal(pick.getAttribute('aria-pressed'), 'true');
+        equal(solutions.shadowRoot!.querySelector('[role=button]'), null);
+        // an error that tells where it is
+        solutions.fail({ name: 'Theory error', message: 'm', syntax: { line: 1, column: 1, length: 1, message: 'm', where: 'theory' } });
+        await solutions.updateComplete;
+        ok(solutions.shadowRoot!.querySelector('.halt .pick'));
+        ok(live());
+    });
+
     it('should tell when a solution could not be computed', async function () {
         const solutions = await element<Arg2pSolutions>('arg2p-solutions');
         const failures: unknown[] = [];
@@ -308,6 +342,19 @@ describe('<arg2p-framework>', function () {
         ok(cy.getElementById('x').hasClass('derived'));
         ok(cy.getElementById('x->b').hasClass('derived'));
         equal(cy.getElementById('a').hasClass('derived'), false);
+    });
+
+    it('should save a picture once something is drawn, as the graph does', async function () {
+        const { editor } = await framework('graphBuildMode(abstract).\n');
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        const png = (it: HTMLElement) => it.shadowRoot!.querySelector<HTMLButtonElement>('.png')!;
+        ok(png(editor).disabled);
+        ok(png(graph).disabled);
+        editor.theory = THEORY;
+        graph.solution = shown(GRAPH);
+        await Promise.all([editor.updateComplete, graph.updateComplete]);
+        equal(png(editor).disabled, false);
+        equal(png(graph).disabled, false);
     });
 
     it('should write the arguments and attacks drawn into the theory', async function () {

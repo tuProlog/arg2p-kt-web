@@ -86,6 +86,12 @@ describe('Framework declarations', function () {
         deepEqual(declaredFramework("% a.\n/* b -> c. */\nname('x. y').\nflies(X) :- bird(X).\nz."), { arguments: ['z'], attacks: [] });
     });
 
+    it('should read no argument in the switches of the flags, and leave them as they are', function () {
+        const switched = 'graphBuildMode(abstract).\nqueryMode.\na.\ndebug.\narg(metaRules).\nb -> a.\n';
+        deepEqual(declaredFramework(switched), { arguments: ['a', 'metaRules', 'b'], attacks: [{ from: 'b', to: 'a' }] });
+        equal(redrawn(switched, { arguments: ['a'], attacks: [] }), 'graphBuildMode(abstract).\nqueryMode.\na.\ndebug.\n');
+    });
+
     it('should leave a theory drawn as it is as it is', function () {
         equal(redrawn(theory, declaredFramework(theory)), theory);
     });

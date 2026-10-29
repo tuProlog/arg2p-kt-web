@@ -1,9 +1,11 @@
+import { FLAGS } from '../flags/schema.js';
+import { attackId } from '../graph/drawing.js';
 import { ATOM } from './atoms.js';
 import type { Framework } from './frameworks.js';
 
 // The arguments and attacks a theory of the profile abstract declares, as written in it (`a.`, `arg(a).`, `a -> b.`,
 // `att(a, b).`, `a <-> b.`), and the theory rewritten for a framework drawn: only those clauses change, every other
-// (the profile, comments, the clauses that derive attacks) stays as it is.
+// (the profile, the switches of the flags, comments, the clauses that derive attacks) stays as it is.
 
 /** A clause of a theory: where it is, from its first character to its full stop included, and its text */
 interface Clause {
@@ -23,6 +25,8 @@ const ARGUMENT_ARG = new RegExp(`^arg\\s*\\(\\s*${NAME}\\s*\\)$`);
 const ATTACK_ARROW = new RegExp(`^${NAME}\\s*->\\s*${NAME}$`);
 const ATTACK_ATT = new RegExp(`^att\\s*\\(\\s*${NAME}\\s*,\\s*${NAME}\\s*\\)$`);
 const MUTUAL = new RegExp(`^${NAME}\\s*<->\\s*${NAME}$`);
+// A fact of one of these names turns a flag on (`queryMode.`): the solver reads it as no argument
+const SWITCHES = new Set(FLAGS.filter(it => it.kind === 'switch').map(it => it.name));
 
 /** The framework [theory] declares: its arguments in the order they are met, with those its attacks name */
 export function declaredFramework(theory: string): Framework {
@@ -55,7 +59,7 @@ export function declaredFramework(theory: string): Framework {
 export function redrawn(theory: string, framework: Framework, renamed: ReadonlyMap<string, string> = new Map()): string {
     const name = (it: string) => renamed.get(it) ?? it;
     const wantedArguments = new Set(framework.arguments);
-    const wantedAttacks = new Set(framework.attacks.map(it => key(it.from, it.to)));
+    const wantedAttacks = new Set(framework.attacks.map(it => attackId(it.from, it.to)));
     const declaredArguments = new Set<string>();
     const declaredAttacks = new Set<string>();
     const edits: { start: number; end: number; text: string }[] = [];
@@ -70,25 +74,25 @@ export function redrawn(theory: string, framework: Framework, renamed: ReadonlyM
             if (text !== null) declaredArguments.add(argument);
         } else if (declaration.kind === 'attack') {
             const [from, to] = [name(declaration.from), name(declaration.to)];
-            text = wantedAttacks.has(key(from, to)) && !declaredAttacks.has(key(from, to)) ? attackText(from, to, declaration.form) : null;
-            if (text !== null) declaredAttacks.add(key(from, to));
+            text = wantedAttacks.has(attackId(from, to)) && !declaredAttacks.has(attackId(from, to)) ? attackText(from, to, declaration.form) : null;
+            if (text !== null) declaredAttacks.add(attackId(from, to));
         } else {
             const [a, b] = [name(declaration.a), name(declaration.b)];
-            const ab = wantedAttacks.has(key(a, b)) && !declaredAttacks.has(key(a, b));
-            const ba = wantedAttacks.has(key(b, a)) && !declaredAttacks.has(key(b, a));
+            const ab = wantedAttacks.has(attackId(a, b)) && !declaredAttacks.has(attackId(a, b));
+            const ba = wantedAttacks.has(attackId(b, a)) && !declaredAttacks.has(attackId(b, a));
             text = ab && ba ? `${a} <-> ${b}` : ab ? attackText(a, b, 'arrow') : ba ? attackText(b, a, 'arrow') : null;
-            if (ab) declaredAttacks.add(key(a, b));
-            if (ba) declaredAttacks.add(key(b, a));
+            if (ab) declaredAttacks.add(attackId(a, b));
+            if (ba) declaredAttacks.add(attackId(b, a));
         }
         if (text === null) edits.push(removal(theory, clause));
         else if (`${text}.` !== clause.text) edits.push({ start: clause.start, end: clause.end, text: `${text}.` });
     });
 
     // an attack declares the arguments it names
-    framework.attacks.filter(it => declaredAttacks.has(key(it.from, it.to))).forEach(it => declaredArguments.add(it.from).add(it.to));
+    framework.attacks.filter(it => declaredAttacks.has(attackId(it.from, it.to))).forEach(it => declaredArguments.add(it.from).add(it.to));
     const added = [
         ...framework.arguments.filter(it => !declaredArguments.has(it)).map(it => `${it}.`),
-        ...framework.attacks.filter(it => !declaredAttacks.has(key(it.from, it.to))).map(it => `${it.from} -> ${it.to}.`),
+        ...framework.attacks.filter(it => !declaredAttacks.has(attackId(it.from, it.to))).map(it => `${it.from} -> ${it.to}.`),
     ];
     if (added.length > 0) {
         if (after >= 0) edits.push({ start: after, end: after, text: added.map(it => `\n${it}`).join('') });
@@ -103,10 +107,6 @@ export function redrawn(theory: string, framework: Framework, renamed: ReadonlyM
     return edits
         .sort((a, b) => b.start - a.start)
         .reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), theory);
-}
-
-function key(from: string, to: string): string {
-    return `${from}->${to}`;
 }
 
 function argumentText(name: string, form: 'fact' | 'arg'): string {
@@ -136,7 +136,7 @@ function declarations(theory: string): { clause: Clause; declaration: Declaratio
 
 function declarationOf(text: string): Declaration | null {
     let match: RegExpExecArray | null;
-    if ((match = ARGUMENT_FACT.exec(text))) return { kind: 'argument', name: match[1], form: 'fact' };
+    if ((match = ARGUMENT_FACT.exec(text))) return SWITCHES.has(match[1]) ? null : { kind: 'argument', name: match[1], form: 'fact' };
     if ((match = ARGUMENT_ARG.exec(text))) return { kind: 'argument', name: match[1], form: 'arg' };
     if ((match = ATTACK_ARROW.exec(text))) return { kind: 'attack', from: match[1], to: match[2], form: 'arrow' };
     if ((match = ATTACK_ATT.exec(text))) return { kind: 'attack', from: match[1], to: match[2], form: 'att' };

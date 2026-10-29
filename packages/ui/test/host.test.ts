@@ -198,6 +198,45 @@ describe('Engine of the browser', function () {
         equal(run.hasNext(), false);
     });
 
+    it('should ask the checks and the settings again of the worker it starts as it stops, failing the query alone', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const run = await solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        const pending = failure(run.next());
+        const checked = solving.check('a :=> b', 'theory');
+        const told = solving.settings('graphBuildMode(abstract).', DEFAULT_FLAGS);
+        solving.stop();
+        equal((await pending)?.stopped, true);
+        equal((await checked)?.line, 1);
+        deepEqual((await told).graphBuildMode, ['abstract']);
+        equal(channels.length, 2);
+    });
+
+    it('should leave the worker be when it is stopped with checks alone waited for', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const checked = solving.check(TWEETY, 'theory');
+        solving.stop();
+        equal(await checked, null);
+        equal(channels.length, 1);
+    });
+
+    it('should read no stage of a query stopped, or replaced', async function () {
+        const solving = engine();
+        const run = await solving.solve({ theory: TWEETY, query: 'arg2p::solve', flags: FLAGS });
+        const first = await run.next();
+        deepEqual(await run.graphAt(first.branch), first.graph);
+        // replaced while its stage is read
+        const stage = failure(run.graphAt(0));
+        const other = await solving.solve({ theory: TWEETY, query: 'arg2p::solve', flags: FLAGS });
+        equal((await stage)?.name, 'Error');
+        // stopped
+        const pending = failure(other.next());
+        solving.stop();
+        equal((await pending)?.stopped, true);
+        equal((await failure(other.graphAt(0)))?.name, 'Error');
+    });
+
     it('should leave the worker be when it is stopped with nothing to stop', async function () {
         const channels: Channel[] = [];
         const solving = engine(channels);

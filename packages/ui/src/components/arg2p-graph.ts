@@ -1,14 +1,16 @@
 import type { Core, StylesheetJson } from 'cytoscape';
-import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
+import { css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Solved } from '../engine.js';
+import { emit } from '../events.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
-import { attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
+import { attackId, attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
 import { levelsOf, supportsOf } from '../graph/levels.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
+import { CanvasElement, canvasStyles } from './canvas-element.js';
 import { popup, popupStyles, type ArgumentShown, type Named } from './popup.js';
-import { buttons, chips, define, emit } from './shared.js';
+import { buttons, chips, define } from './shared.js';
 
 // The layout keeps nodes this far apart, edge to edge, and rows at least LEVEL_SEPARATION apart
 const NODE_GAP = 40;
@@ -40,7 +42,7 @@ const STYLE: StylesheetJson = [
  * where the arguments of an abstract framework are, as they are laid out or dragged; `arg2p-export` with the picture
  * (cancel it to save the picture another way; otherwise it is downloaded).
  */
-export class Arg2pGraph extends LitElement {
+export class Arg2pGraph extends CanvasElement {
     static override properties = {
         solution: { attribute: false },
         positions: { attribute: false },
@@ -67,26 +69,15 @@ export class Arg2pGraph extends LitElement {
     private drawnStage = 0;
 
     // One drawing per element: moving between the stages updates it in place, so that arguments keep their place
-    private readonly canvas = new Canvas(this, { style: STYLE, redraw: () => this.draw() });
+    protected readonly canvas = new Canvas(this, { style: STYLE, redraw: () => this.draw() });
 
     /** Whether there is nothing to show: no arguments, and no stages to browse (the attribute `empty`: a page may hide the graph) */
     get empty(): boolean {
         return this.drawn.arguments.length === 0 && this.last === null;
     }
 
-    /** The graph as a PNG picture, as a data URL: the whole of it, on the background of the element */
-    png(): string {
-        return this.canvas.png();
-    }
-
-    /** Fits the drawing to the element */
-    fit(): void {
-        this.canvas.fit();
-    }
-
-    /** Draws the graph again, in the colours the page sets now (after a change of theme) */
-    restyle(): void {
-        this.canvas.restyle();
+    protected get blank(): boolean {
+        return this.drawn.arguments.length === 0;
     }
 
     // The last stage of the computation, when its stages can be browsed
@@ -121,7 +112,7 @@ export class Arg2pGraph extends LitElement {
         const edges: Drawn[] = [
             ...graph.attacks.map(it => ({
                 group: 'edges' as const,
-                data: { id: `${it.from}->${it.to}`, source: it.from, target: it.to, tone: labels.get(it.from) ?? 'na', curve: 0 },
+                data: { id: attackId(it.from, it.to), source: it.from, target: it.to, tone: labels.get(it.from) ?? 'na', curve: 0 },
                 classes: abstract ? 'attack' : 'attack layered',
             })),
             ...supports.map(it => ({
@@ -156,7 +147,7 @@ export class Arg2pGraph extends LitElement {
                 const from = positions.get(it.from);
                 const to = positions.get(it.to);
                 if (from === undefined || to === undefined) return;
-                cy.getElementById(`${it.from}->${it.to}`).data('curve', curveOf(from, to) * Math.hypot(to.x - from.x, to.y - from.y));
+                cy.getElementById(attackId(it.from, it.to)).data('curve', curveOf(from, to) * Math.hypot(to.x - from.x, to.y - from.y));
             });
         });
     }
@@ -210,10 +201,7 @@ export class Arg2pGraph extends LitElement {
                               </label>
                           `}
                 </div>
-                <button type="button" class="png" title="Download the graph as a picture" ?disabled=${this.drawn.arguments.length === 0} @click=${() => this.canvas.export(this.fileName)}>
-                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                    PNG
-                </button>
+                ${this.renderPng('graph')}
                 ${last === null
                     ? nothing
                     : html`
@@ -266,21 +254,10 @@ export class Arg2pGraph extends LitElement {
         buttons,
         chips,
         popupStyles,
+        canvasStyles,
         css`
-            :host {
-                display: flex;
-                flex-direction: column;
-                min-height: 200px;
-                background: var(--_surface);
-                font-size: 13px;
-            }
             .bar {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
                 gap: 6px 16px;
-                padding: 6px 10px;
-                border-bottom: 1px solid var(--_border);
                 color: var(--_muted);
             }
             .legend {
@@ -316,16 +293,6 @@ export class Arg2pGraph extends LitElement {
                 min-width: 80px;
                 text-align: center;
                 font-variant-numeric: tabular-nums;
-            }
-            .area {
-                flex: 1;
-                min-height: 0;
-                position: relative;
-                overflow: hidden;
-            }
-            .canvas {
-                position: absolute;
-                inset: 0;
             }
             .none {
                 position: absolute;

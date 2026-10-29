@@ -1,8 +1,9 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { EngineError, Run, SolutionData, Solved } from '../engine.js';
+import { emit } from '../events.js';
 import { listItems } from '../formats/terms.js';
 import { tokens } from '../theme.js';
-import { activate, buttons, chip, chips, define, emit } from './shared.js';
+import { buttons, chip, chips, define } from './shared.js';
 
 // Bindings named after a label (In, Out, Und) hold sets of arguments or statements: shown as chips coloured like the
 // graph
@@ -143,7 +144,12 @@ export class Arg2pSolutions extends LitElement {
         if (changed.has('entries')) this.renderRoot.querySelector('.solution:last-child')?.scrollIntoView?.({ block: 'nearest' });
     }
 
+    // What readers of the screen are told as it happens lives in a region of its own, there all along
     protected override render() {
+        return html`${this.renderSolutions()}<div class="live" role="status">${this.busy ? 'Solving…' : ''}</div>`;
+    }
+
+    private renderSolutions() {
         if (this.error !== null) return this.renderError(this.error);
         if (this.run === null) return nothing;
         return html`
@@ -153,24 +159,18 @@ export class Arg2pSolutions extends LitElement {
             </div>
             <ol class="list">
                 ${this.entries.map(entry => this.renderEntry(entry))}
-                ${this.busy ? html`<li class="pending" aria-live="polite">Solving…</li>` : nothing}
+                ${this.busy ? html`<li class="pending" aria-hidden="true">Solving…</li>` : nothing}
             </ol>
         `;
     }
 
+    // An error that tells where it is takes there: its header a button, the whole of it a target for the pointer
     private renderError(error: EngineError) {
-        const where = error.syntax;
-        const select = () => emit(this, 'arg2p-error-select', { error });
+        const select = error.syntax === null ? null : () => emit(this, 'arg2p-error-select', { error });
         return html`
             <ol class="list">
-                <li
-                    class="solution halt ${where !== null ? 'selectable' : ''}"
-                    tabindex=${where !== null ? 0 : -1}
-                    title=${where !== null ? 'Go to the error' : ''}
-                    @click=${where !== null ? select : null}
-                    @keydown=${where !== null ? (e: KeyboardEvent) => activate(e, select) : null}
-                >
-                    ${header('error', error.name)}
+                <li class="solution halt ${select !== null ? 'selectable' : ''}" @click=${select}>
+                    ${select !== null ? html`<button type="button" class="pick" title="Go to the error">${header('error', error.name)}</button>` : header('error', error.name)}
                     <div class="error">${error.message}</div>
                 </li>
             </ol>
@@ -186,18 +186,10 @@ export class Arg2pSolutions extends LitElement {
         if (solution.result === 'halt') {
             return html`<li class="solution halt">${header('halt', 'Halted')}<div class="error">${solution.error ?? ''}</div></li>`;
         }
-        const pick = () => this.show(entry);
+        // its header a button, the whole of it a target for the pointer
         return html`
-            <li
-                class="solution yes selectable ${this.shown === entry ? 'shown' : ''}"
-                tabindex="0"
-                role="button"
-                aria-pressed=${this.shown === entry}
-                title="Show the graph of this solution"
-                @click=${pick}
-                @keydown=${(e: KeyboardEvent) => activate(e, pick)}
-            >
-                ${header('yes', `Solution ${accepted}`)}
+            <li class="solution yes selectable ${this.shown === entry ? 'shown' : ''}" @click=${() => this.show(entry)}>
+                <button type="button" class="pick" aria-pressed=${this.shown === entry} title="Show the graph of this solution">${header('yes', `Solution ${accepted}`)}</button>
                 ${solution.bindings.length > 0 ? bindings(solution.bindings) : html`<div class="term">${solution.query}</div>`}
             </li>
         `;
@@ -248,10 +240,21 @@ export class Arg2pSolutions extends LitElement {
             .selectable:hover {
                 background: var(--_hover);
             }
-            .selectable:focus {
+            .list .pick,
+            .list .pick:hover:not(:disabled) {
+                display: block;
+                width: 100%;
+                padding: 0;
+                border: none;
+                background: none;
+                color: inherit;
+                font: inherit;
+                text-align: start;
+            }
+            .pick:focus {
                 outline: none;
             }
-            .selectable:focus-visible,
+            .selectable:has(.pick:focus-visible),
             .shown {
                 box-shadow: 0 0 0 2px color-mix(in srgb, var(--_accent) 45%, transparent);
             }
@@ -260,6 +263,14 @@ export class Arg2pSolutions extends LitElement {
             }
             .solution.halt {
                 border-left-color: var(--_error);
+            }
+            .live {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
             }
             .header {
                 display: flex;
@@ -271,12 +282,14 @@ export class Arg2pSolutions extends LitElement {
                 font-weight: bold;
                 text-transform: uppercase;
                 letter-spacing: 0.04em;
-                color: #ffffff;
+                color: var(--_surface);
                 background: var(--_accent);
                 border-radius: 4px;
                 padding: 1px 6px;
             }
+            /* the yellow of no is the same in every theme: dark is written on it */
             .no .badge {
+                color: #212529;
                 background: var(--_no);
             }
             .halt .badge {
@@ -326,8 +339,9 @@ export class Arg2pSolutions extends LitElement {
     ];
 }
 
+// Phrasing alone: it may be the content of a button
 function header(badge: string, title: string) {
-    return html`<div class="header"><span class="badge">${badge}</span><span>${title}</span></div>`;
+    return html`<span class="header"><span class="badge">${badge}</span><span>${title}</span></span>`;
 }
 
 // `Variable = value` rows. A value of a label variable that is a list shows its items as chips; any other value keeps
