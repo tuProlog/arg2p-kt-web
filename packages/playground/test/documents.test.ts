@@ -143,11 +143,24 @@ describe('Documents', function () {
         ok(ws.closed[0].id !== ws.tabs[0].id);
     });
 
+    it('should start from the key of version 1, and never write it', function () {
+        const storage = memoryStorage();
+        const old = store.create(store.emptyWorkspace(), doc('old.'), 'Old');
+        storage.setItem(store.LEGACY_KEY, JSON.stringify(old));
+        deepEqual(store.load(storage), old);
+        // saved under a key of its own: what an older page still open writes is left alone, and aside
+        const mine = store.create(old, doc('new.'), 'New');
+        ok(store.save(storage, mine));
+        storage.setItem(store.LEGACY_KEY, JSON.stringify(store.emptyWorkspace()));
+        deepEqual(store.load(storage), mine);
+        deepEqual(JSON.parse(storage.getItem(store.LEGACY_KEY)!), store.emptyWorkspace());
+    });
+
     it('should bring up to date a workspace of version 1, a framework drawn becoming a theory', function () {
         const storage = memoryStorage();
         const flags = 'graphBuildMode(standard_af).\nargumentLabellingMode(preferred).\nqueryMode.';
         storage.setItem(
-            store.KEY,
+            store.LEGACY_KEY,
             JSON.stringify({
                 version: 1,
                 active: 'd2',

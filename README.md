@@ -68,19 +68,27 @@ ICCMA'23 files as theories, and exported to APX and TGF.
   <img src="docs/phone.png" width="200" alt="The drawing on a phone">
 </p>
 
-## Federation
+## Parallel runs and the federation
 
-The *Federation* tab pairs the playground with that of another device on the same network, with no server: each lends
-the other the workers of its Web Workers, and a statement is solved by the workers of both (the federation of the
-[parallel solver](https://tuprolog.github.io/arg2p-kt/docs/modules/parallel-solver/)).
+*Parallel*, a switch next to the tabs of the solver, runs the query on the parallel solver: on the Web Workers of the
+page (one less than the processors of the device, at most 4), and on those of the devices it is paired with, as the
+[federation](https://tuprolog.github.io/arg2p-kt/docs/modules/parallel-solver/) of the parallel solver. A parallel run
+answers what the solver of the page answers, a solution at a time with its graph, with no stages.
 
-1. *Invite a device* shows a QR code, and a link: the other device scans it with its camera (or opens the link), and
-   its playground shows a reply, as a QR code and a link.
-2. *Scan its reply* reads it with the camera of the first device (or paste it, or open the reply link on that device:
-   the page that invited takes it).
+The *Federation* tab pairs the playground with that of another device on the same network, and tells the devices
+paired, their workers, how they are linked, and what the last parallel run built and how long it took.
 
-Once paired, *Solve on the federation* gives the arguments of a statement of the theory, in, out and und. A device runs
-the theories the others send it: pair only with devices you trust.
+1. *Invite a device* shows a QR code (and its link, to copy or share): the other device scans it with its camera, or
+   opens the link, and joins once asked (joining starts its workers, and connects to the device that invited).
+2. The other device shows a short code: type it on the device that invited, and they pair.
+
+The reply of the device that joins goes through a public relay, [ntfy.sh](https://ntfy.sh) unless another one is set
+(*Relay*, at the end of the tab: a ntfy server of your own works too), sealed with a key that only the QR code carries:
+the relay reads none of it, and the code tells which reply comes from the device in front of you. Should the relay be
+out of reach, the device that joins shows its reply as a QR code and a link: scan it, paste it, or open it on the device
+that invited.
+
+A device runs the theories the others send it: pair only with devices you trust.
 
 ## Sharing a setup
 

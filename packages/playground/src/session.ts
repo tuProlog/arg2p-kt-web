@@ -8,6 +8,9 @@ import type { Content, Doc, Storage, Workspace } from './documents.js';
 // its own active document. The browser tells the other pages about every change: their tabs follow, and so does the
 // document they show, unless they are editing it. When the same document is edited in two pages at once, the last
 // save wins and the version it replaces is kept among the closed ones, so nothing is lost.
+//
+// What the browser does not keep (its storage full, say) stays in the page and is saved again at the next change; the
+// page is told, and meanwhile shows no other document, which would let go the edits not saved of this one.
 
 const AUTOSAVE_DELAY = 400;
 const CONFLICT = 'other window';
@@ -17,6 +20,8 @@ export interface SessionListener {
     show(doc: Doc): void;
     /** The tabs (or the closed documents) changed */
     changed(workspace: Workspace, active: string | null): void;
+    /** The browser did not keep what changed: it is kept in the page, and saved again at the next change */
+    unsaved(): void;
 }
 
 export class Session {
@@ -62,8 +67,7 @@ export class Session {
 
     /** Opens [content] in a new tab, after the active one */
     open(content: Content, name: string | null): void {
-        this.transact(ws => store.create(ws, content, name));
-        this.load(this.activeDocument!);
+        if (this.transact(ws => store.create(ws, content, name), true)) this.load(this.activeDocument!);
     }
 
     /** The active document as edited: saved once the editing settles */
@@ -84,19 +88,16 @@ export class Session {
 
     select(id: string): void {
         if (id === this.active) return;
-        this.transact(ws => store.activate(ws, id));
-        this.load(this.activeDocument!);
+        if (this.transact(ws => store.activate(ws, id), true)) this.load(this.activeDocument!);
     }
 
     close(id: string): void {
         const wasActive = id === this.active;
-        this.transact(ws => store.close(ws, id));
-        if (wasActive) this.load(this.activeDocument!);
+        if (this.transact(ws => store.close(ws, id), wasActive) && wasActive) this.load(this.activeDocument!);
     }
 
     reopen(id: string): void {
-        this.transact(ws => store.reopen(ws, id));
-        this.load(this.activeDocument!);
+        if (this.transact(ws => store.reopen(ws, id), true)) this.load(this.activeDocument!);
     }
 
     rename(id: string, name: string): void {
@@ -107,12 +108,11 @@ export class Session {
         this.transact(store.clearClosed);
     }
 
-    /** Saves what is being edited now */
-    flush(): void {
+    /** Saves what is being edited now: whether the browser kept it (else it is kept here, to be saved again) */
+    flush(): boolean {
         clearTimeout(this.timer);
         const pending = this.pending;
-        if (pending === null || this.active === null) return;
-        this.pending = null;
+        if (pending === null || this.active === null) return true;
         let ws = this.stored();
         const mine = this.activeDocument ?? { ...pending, id: this.active, name: 'Recovered', updated: Date.now() };
         const theirs = ws.tabs.find(it => it.id === this.active);
@@ -121,25 +121,35 @@ export class Session {
         // closed by another page while edited here: it comes back
         ws = store.recover(ws, mine);
         ws = store.update(ws, this.active, pending);
-        store.save(this.storage, { ...ws, active: this.active });
+        if (!store.save(this.storage, { ...ws, active: this.active })) {
+            this.listener.unsaved();
+            return false;
+        }
+        this.pending = null;
         this.workspace = ws;
         this.seen = this.activeDocument!.updated;
         this.listener.changed(this.workspace, this.active);
+        return true;
     }
 
     private stored(): Workspace {
         return store.load(this.storage) ?? store.emptyWorkspace();
     }
 
-    // A change applied to the memory as stored right now (with this page's pending edits), saved and shown
-    private transact(change: (workspace: Workspace) => Workspace): void {
-        this.flush();
+    // A change applied to the memory as stored right now (with this page's pending edits), saved and shown (in the
+    // page, should the browser not keep it): whether it was made. One that [shows another] document waits for the edits
+    // of this one to be saved; any other may make room for them, and they are saved again after it.
+    private transact(change: (workspace: Workspace) => Workspace, showsAnother = false): boolean {
+        const saved = this.flush();
+        if (!saved && showsAnother) return false;
         const stored = this.stored();
         const next = change({ ...stored, active: this.active ?? stored.active });
-        store.save(this.storage, next);
+        if (!store.save(this.storage, next)) this.listener.unsaved();
         this.workspace = next;
         this.active = next.active;
         this.listener.changed(this.workspace, this.active);
+        if (!saved) this.flush();
+        return true;
     }
 
     private load(doc: Doc): void {

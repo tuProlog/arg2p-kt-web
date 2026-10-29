@@ -1,7 +1,7 @@
 import jsQR from 'jsqr';
 import { encode } from 'uqr';
 import { assert, describe, it } from 'vitest';
-import { readArgument } from '../src/federation/arguments.js';
+import { deviceName, devicesOf, type FederationStats } from '../src/federation/federation.js';
 import { codeIn, pairingLink, readPairing } from '../src/federation/links.js';
 
 const { deepEqual, equal } = assert;
@@ -53,14 +53,32 @@ describe('The links of a pairing', function () {
     });
 });
 
-describe('The arguments of a federation', function () {
-    it('should tell what an argument concludes, and its rules', function () {
-        deepEqual(readArgument('[[d3(jack), d1(jack), f2], d1(jack), [flies(jack)], [bird(jack)], [[d1(jack)], [d3(jack), d1(jack)], [f2]]]'), {
-            conclusion: 'flies(jack)',
-            rules: ['d3(jack)', 'd1(jack)', 'f2'],
-        });
-        deepEqual(readArgument("[[f1], f1, [says('a, b')], [], []]"), { conclusion: "says('a, b')", rules: ['f1'] });
-        equal(readArgument('flies(jack)'), null);
-        equal(readArgument('[[a], b]'), null);
+describe('The devices of a federation', function () {
+    // as a cluster paired with another tells them: its own site (its Web Workers included), its Web Workers, the other
+    // device, and one beyond it
+    const stats: FederationStats = {
+        site: 'site-a',
+        sites: [
+            { id: 'site-a', workers: 2, delegate: false, via: null },
+            { id: 'site-a1', workers: 1, delegate: true, via: null },
+            { id: 'site-a2', workers: 1, delegate: true, via: null },
+            { id: 'site-b', workers: 4, delegate: false, via: null },
+            { id: 'site-c', workers: null, delegate: false, via: 'site-b' },
+        ],
+        evaluation: null,
+    };
+
+    it('should tell this device first, then the others', function () {
+        deepEqual(devicesOf(stats), [
+            { id: 'site-a', name: 'This device', workers: 2, via: null },
+            { id: 'site-b', name: 'Device 1', workers: 4, via: null },
+            { id: 'site-c', name: 'Device 2', workers: null, via: 'Device 1' },
+        ]);
+    });
+
+    it('should tell the device a worker ran on', function () {
+        equal(deviceName(stats, 'site-a2'), 'This device');
+        equal(deviceName(stats, 'site-b'), 'Device 1');
+        equal(deviceName(stats, 'site-x'), 'site-x');
     });
 });

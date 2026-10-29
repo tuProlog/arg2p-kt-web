@@ -13,8 +13,25 @@ function memoryStorage(): Storage {
 // A session, and what it showed and told
 function session(storage = memoryStorage()) {
     const shown: Doc[] = [];
-    const created = new Session(storage, { show: doc => shown.push(doc), changed: () => {} });
-    return { session: created, shown, storage };
+    const told = { unsaved: 0 };
+    const created = new Session(storage, { show: doc => shown.push(doc), changed: () => {}, unsaved: () => told.unsaved++ });
+    return { session: created, shown, storage, told };
+}
+
+// A storage that fills up when told
+function fillable() {
+    const storage = memoryStorage();
+    const state = { full: false };
+    return {
+        state,
+        storage: {
+            getItem: storage.getItem,
+            setItem: (key: string, value: string) => {
+                if (state.full) throw new Error('QuotaExceededError');
+                storage.setItem(key, value);
+            },
+        } satisfies Storage,
+    };
 }
 
 describe('Session', function () {
@@ -61,6 +78,30 @@ describe('Session', function () {
             ws.closed.map(it => [it.name, it.theory]),
             [['Shared (other window)', 'theirs.']],
         );
+    });
+
+    it('should keep the edits the browser does not keep, tell it, and save them once it can', function () {
+        const { storage, state } = fillable();
+        const { session: editing, shown, told } = session(storage);
+        editing.restore(() => store.blank(), 'Mine');
+        editing.open({ ...store.blank(), theory: 'other.' }, 'Other');
+        const other = editing.activeDocument!.id;
+        editing.select(editing.current.tabs[0].id);
+        state.full = true;
+        editing.edit({ theory: 'kept.' });
+        equal(editing.flush(), false);
+        equal(told.unsaved, 1);
+        deepEqual(editing.content()?.theory, 'kept.');
+        // no other document shown meanwhile: its edits would be let go
+        const showing = shown.length;
+        editing.select(other);
+        equal(shown.length, showing);
+        equal(editing.activeDocument!.name, 'Mine');
+        // room again: saved at the next change
+        state.full = false;
+        editing.rename(editing.activeDocument!.id, 'Kept');
+        const saved = store.activeDocument(store.load(storage)!)!;
+        deepEqual([saved.name, saved.theory], ['Kept', 'kept.']);
     });
 
     it('should open, close and reopen documents, showing the active one', function () {

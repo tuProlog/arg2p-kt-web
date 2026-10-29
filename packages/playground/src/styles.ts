@@ -1,14 +1,12 @@
 import { css } from 'lit';
 
-// The layout of the playground: the theory on the left, the query and its results on the right; one column on small
-// screens. The colours are the custom properties of the page (index.html), which the components read too.
-export const styles = css`
+// The look of the playground. The colours are the custom properties of the page (index.html), which the components of
+// @tuprolog/arg2p-ui read too.
+
+/** What every part of the playground shares: its buttons, fields and links, and the text said aside */
+export const controls = css`
     :host {
-        display: flex;
-        flex-direction: column;
-        height: 100dvh;
         color: var(--arg2p-text);
-        background: var(--page);
         font-family: var(--arg2p-font);
         font-size: 14px;
     }
@@ -33,6 +31,14 @@ export const styles = css`
         opacity: 0.5;
         cursor: default;
     }
+    button.primary {
+        color: #ffffff;
+        background: var(--arg2p-accent);
+        border-color: var(--arg2p-accent);
+    }
+    button.primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--arg2p-accent) 85%, black);
+    }
     button.link {
         border: none;
         background: none;
@@ -48,6 +54,15 @@ export const styles = css`
     button.icon svg {
         fill: currentColor;
     }
+    input[type='text'] {
+        min-width: 0;
+        font: 13px var(--arg2p-mono);
+        color: var(--arg2p-text);
+        background: var(--arg2p-surface-2);
+        border: 1px solid var(--arg2p-border);
+        border-radius: 6px;
+        padding: 6px 8px;
+    }
     a {
         color: var(--arg2p-accent);
         text-decoration: none;
@@ -59,46 +74,16 @@ export const styles = css`
         color: var(--arg2p-muted);
         font-size: 13px;
     }
+    .error {
+        color: var(--arg2p-error);
+    }
+`;
 
-    /* the bar on top */
-    .top {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px 12px;
-        border-bottom: 1px solid var(--arg2p-border);
-        background: var(--arg2p-surface-2);
-    }
-    .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 600;
-        font-size: 16px;
-        color: var(--arg2p-text);
-    }
-    .brand span {
-        font-weight: 400;
-        color: var(--arg2p-muted);
-    }
-    .version {
-        font-size: 12px;
-        color: var(--arg2p-muted);
-        font-variant-numeric: tabular-nums;
-    }
-    .notice {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        padding: 6px 12px;
-        font-size: 13px;
-        background: color-mix(in srgb, var(--arg2p-accent) 12%, transparent);
-    }
-    .notice.error {
-        background: color-mix(in srgb, var(--arg2p-error) 12%, transparent);
-    }
-
-    /* menus: a summary and a list under it */
+/**
+ * The menus: a summary, and a list under it (see Menus). On phones the list is as wide as the screen, under the bar it
+ * opens from (which is positioned).
+ */
+export const menus = css`
     details.menu {
         position: relative;
     }
@@ -114,7 +99,7 @@ export const styles = css`
         font-size: 11px;
         color: var(--arg2p-muted);
     }
-    details.history > summary::after {
+    details.menu.bare > summary::after {
         content: none;
     }
     .menu-list {
@@ -172,67 +157,100 @@ export const styles = css`
         margin: 4px 0;
         width: 100%;
     }
+    @media (max-width: 600px) {
+        details.menu {
+            position: static;
+        }
+        details.menu > summary {
+            white-space: nowrap;
+        }
+        .menu-list,
+        .menu-list.right {
+            left: 8px;
+            right: 8px;
+            min-width: 0;
+        }
+    }
+`;
 
-    /* the tabs of the working memory */
-    .tabs {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 4px 8px 0 8px;
-        border-bottom: 1px solid var(--arg2p-border);
-    }
-    .tab-list {
-        display: flex;
-        align-items: flex-end;
-        gap: 2px;
-        min-width: 0;
-        overflow-x: auto;
-        scrollbar-width: thin;
-        align-self: stretch;
-    }
-    .tab {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        max-width: 220px;
-        padding: 4px 6px 4px 12px;
-        border: 1px solid transparent;
-        border-bottom: none;
-        border-radius: 6px 6px 0 0;
-        cursor: pointer;
-        white-space: nowrap;
-        color: var(--arg2p-muted);
-    }
-    .tab.active {
+/** The dialogs: a card over the page, dimmed */
+export const dialogs = css`
+    dialog {
         color: var(--arg2p-text);
         background: var(--arg2p-surface);
-        border-color: var(--arg2p-border);
-        margin-bottom: -1px;
-        padding-bottom: 5px;
+        border: 1px solid var(--arg2p-border);
+        border-radius: 10px;
+        width: min(560px, calc(100vw - 32px));
+        padding: 16px 20px;
     }
-    .tab .name {
-        overflow: hidden;
-        text-overflow: ellipsis;
+    dialog::backdrop {
+        background: rgba(0, 0, 0, 0.4);
     }
-    .tab .close {
-        border: none;
-        background: none;
-        padding: 0 4px;
-        color: var(--arg2p-muted);
+    dialog h2 {
+        margin: 0 0 4px 0;
+        font-size: 18px;
     }
-    .tab .rename {
-        font: inherit;
-        width: 12em;
+    .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
     }
-    .tabs .new,
-    .tabs summary {
-        border: none;
-        background: none;
-        padding: 2px 8px;
-        display: inline-flex;
+`;
+
+// The layout of the playground: the theory on the left, its solver on the right; one column on small screens
+const layout = css`
+    :host {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        background: var(--page);
     }
 
-    /* the theory, and the query with its results */
+    /* the bar on top */
+    .top {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--arg2p-border);
+        background: var(--arg2p-surface-2);
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--arg2p-text);
+    }
+    .brand span {
+        font-weight: 400;
+        color: var(--arg2p-muted);
+    }
+    .version {
+        font-size: 12px;
+        color: var(--arg2p-muted);
+        font-variant-numeric: tabular-nums;
+    }
+    .notice {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 6px 12px;
+        font-size: 13px;
+        background: color-mix(in srgb, var(--arg2p-accent) 12%, transparent);
+    }
+    .notice.error {
+        color: inherit;
+        background: color-mix(in srgb, var(--arg2p-error) 12%, transparent);
+    }
+    .notice span {
+        flex: 1;
+    }
+
+    /* the theory, and its solver */
     main {
         flex: 1;
         min-height: 0;
@@ -240,32 +258,7 @@ export const styles = css`
         grid-template-columns: minmax(240px, var(--theory)) auto minmax(320px, 1fr);
         padding: 10px;
     }
-    /* what resizes two columns: a strip between them, dragged or moved with the arrows */
-    .divider {
-        width: 10px;
-        cursor: col-resize;
-        touch-action: none;
-        position: relative;
-        outline: none;
-    }
-    .divider::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 4px;
-        width: 2px;
-        border-radius: 1px;
-        background: transparent;
-        transition: background 0.15s;
-    }
-    .divider:hover::after,
-    .divider:focus-visible::after,
-    .divider.dragging::after {
-        background: var(--arg2p-accent);
-    }
-    .theory,
-    .work {
+    .theory {
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -273,6 +266,7 @@ export const styles = css`
         min-width: 0;
     }
     .bar {
+        position: relative;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -286,172 +280,30 @@ export const styles = css`
     .title {
         font-weight: 600;
     }
-    .profile {
-        font-size: 12px;
-        padding: 1px 8px;
-        border-radius: 10px;
-        color: var(--arg2p-accent);
-        border: 1px solid var(--arg2p-accent);
-    }
     #theory {
         flex: 1;
     }
-    .query {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    arg2p-solver {
+        min-width: 0;
+        min-height: 0;
     }
-    .prompt {
-        font-family: var(--arg2p-mono);
-        color: var(--arg2p-muted);
-    }
-    #query {
-        flex: 1;
-    }
-    .run,
-    .stop {
+
+    /* the switch between the solver of the page and the parallel one, among the actions of the solver */
+    .mode {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        font-weight: 600;
-        padding: 6px 18px;
-    }
-    .run {
-        color: #ffffff;
-        background: var(--arg2p-accent);
-        border-color: var(--arg2p-accent);
-    }
-    .run:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--arg2p-accent) 85%, black);
-    }
-    .stop {
-        color: var(--arg2p-error);
-        border-color: var(--arg2p-error);
-    }
-    .spinner {
-        width: 12px;
-        height: 12px;
-        border: 2px solid currentColor;
-        border-right-color: transparent;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .spinner {
-            animation: none;
-        }
-    }
-    .panel-tabs {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        border-bottom: 1px solid var(--arg2p-border);
-    }
-    .panel-tabs > button {
-        border: none;
-        border-bottom: 2px solid transparent;
-        border-radius: 0;
-        background: none;
-        color: var(--arg2p-muted);
-    }
-    .panel-tabs > button.active {
-        color: var(--arg2p-text);
-        border-bottom-color: var(--arg2p-accent);
-    }
-    .panel {
-        flex: 1;
-        min-height: 0;
-    }
-    .results {
-        display: grid;
-        grid-template-columns: minmax(180px, var(--solutions)) auto minmax(240px, 1fr);
-    }
-    arg2p-solutions {
-        overflow: auto;
-        min-height: 0;
-    }
-    .view {
-        display: flex;
-        min-height: 0;
-    }
-    .view > * {
-        flex: 1;
-        min-width: 0;
-        border: 1px solid var(--arg2p-border);
-        border-radius: 6px;
-        overflow: hidden;
-    }
-    /* nothing to draw and no stages (a plain Prolog query): the solutions take the room */
-    .results:has(arg2p-graph[empty]:not([hidden])) {
-        grid-template-columns: 1fr;
-    }
-    .results:has(arg2p-graph[empty]:not([hidden])) .view,
-    .results:has(arg2p-graph[empty]:not([hidden])) .divider {
-        display: none;
-    }
-    .flags,
-    .console,
-    .federation {
-        overflow: auto;
-    }
-    .flags-text summary {
-        cursor: pointer;
-        border: none;
-        background: none;
-        padding: 8px 0;
-        color: var(--arg2p-muted);
-    }
-    #flags {
-        height: 200px;
-    }
-    .console pre {
-        margin: 0;
-        padding: 8px;
-        font-family: var(--arg2p-mono);
         font-size: 13px;
-        white-space: pre-wrap;
+        color: var(--arg2p-muted);
+        cursor: pointer;
+        padding: 2px 4px;
     }
-
-    /* the dialog of a shared link */
-    dialog.share {
-        color: var(--arg2p-text);
-        background: var(--arg2p-surface);
-        border: 1px solid var(--arg2p-border);
-        border-radius: 10px;
-        width: min(560px, calc(100vw - 32px));
-        padding: 16px 20px;
+    .mode input {
+        accent-color: var(--arg2p-accent);
+        margin: 0;
     }
-    dialog.share::backdrop {
-        background: rgba(0, 0, 0, 0.4);
-    }
-    dialog.share h2 {
-        margin: 0 0 4px 0;
-        font-size: 18px;
-    }
-    .share-link {
-        display: flex;
-        gap: 8px;
-    }
-    .share-link input {
-        flex: 1;
-        min-width: 0;
-        font: 13px var(--arg2p-mono);
-        color: var(--arg2p-text);
-        background: var(--arg2p-surface-2);
-        border: 1px solid var(--arg2p-border);
-        border-radius: 6px;
-        padding: 6px 8px;
-    }
-    .share-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 12px;
+    .mode.on {
+        color: var(--arg2p-accent);
     }
 
     /* small screens: one column, the theory first */
@@ -464,25 +316,21 @@ export const styles = css`
             grid-template-columns: 1fr;
             gap: 10px;
         }
-        .divider {
+        main > arg2p-divider {
             display: none;
         }
         #theory {
             height: 45vh;
         }
-        .results {
-            grid-template-columns: 1fr;
-            gap: 10px;
-        }
-        .view {
-            height: 60vh;
+        arg2p-solver {
+            height: max(560px, 85dvh);
         }
         .wide {
             display: none;
         }
     }
 
-    /* phones: the bar on top on one line, and the menus as wide as the screen, under the bar they open from */
+    /* phones: the bar on top on one line, and the solver as tall as what it shows (its graph under the solutions) */
     @media (max-width: 600px) {
         .top {
             gap: 8px;
@@ -490,22 +338,11 @@ export const styles = css`
         .top .version {
             display: none;
         }
-        details.menu > summary {
-            white-space: nowrap;
-        }
-        .top,
-        .tabs,
-        .bar {
-            position: relative;
-        }
-        details.menu {
-            position: static;
-        }
-        .menu-list,
-        .menu-list.right {
-            left: 8px;
-            right: 8px;
-            min-width: 0;
+        arg2p-solver {
+            height: auto;
         }
     }
 `;
+
+/** The playground */
+export const styles = [controls, menus, dialogs, layout];

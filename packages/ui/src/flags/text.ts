@@ -1,3 +1,4 @@
+import { quote, unquote } from '../formats/atoms.js';
 import { FLAGS, type Flag } from './schema.js';
 
 // The flags as a text of Prolog facts, `name(value).` or a plain `name.` switch: the text stays the source of truth,
@@ -5,8 +6,6 @@ import { FLAGS, type Flag } from './schema.js';
 
 /** What a text states for a flag: its values (for a switch, `true` if it is there), or nothing when it does not state it */
 export type Stated = ReadonlyMap<string, readonly string[]>;
-
-const ATOM = /^[a-z][a-zA-Z0-9_]*$/;
 
 function escape(name: string): string {
     return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -19,15 +18,6 @@ function valueLine(name: string): RegExp {
 
 function switchLine(name: string): RegExp {
     return new RegExp(`^\\s*${escape(name)}\\s*\\.\\s*(%.*)?$`);
-}
-
-function unquote(value: string): string {
-    const quoted = /^'(.*)'$/.exec(value);
-    return quoted ? quoted[1].replace(/''/g, "'") : value;
-}
-
-function quote(value: string): string {
-    return ATOM.test(value) ? value : `'${value.replace(/'/g, "''")}'`;
 }
 
 function valuesOf(text: string, name: string): string[] {

@@ -34,33 +34,42 @@ async function reader(): Promise<(video: HTMLVideoElement) => Promise<string | n
 }
 
 /**
- * Shows the camera (the one at the back, on a phone) in [video], and gives [found] the first QR code it reads. Gives
- * what stops it; fails if there is no camera, or the user refuses it.
+ * Shows the camera (the one at the back, on a phone) in [video], and gives [found] the QR codes it reads, until one is
+ * what it looks for (found tells) or [signal] aborts it. Fails if there is no camera, the user refuses it, or it is
+ * aborted before it shows; the camera is let go whenever it stops.
  */
-export async function scanQr(video: HTMLVideoElement, found: (text: string) => void): Promise<() => void> {
+export async function scanQr(video: HTMLVideoElement, found: (text: string) => boolean, signal: AbortSignal): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    let stopped = false;
     const stop = () => {
-        stopped = true;
         stream.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     };
-    video.srcObject = stream;
-    video.setAttribute('playsinline', '');
-    video.muted = true;
-    await video.play();
-    const read = await reader();
+    // aborted while the user was asked for the camera, or as it is let go: stopped all the same
+    if (signal.aborted) {
+        stop();
+        throw new DOMException('The scan was cancelled.', 'AbortError');
+    }
+    signal.addEventListener('abort', stop, { once: true });
+    let read: (video: HTMLVideoElement) => Promise<string | null>;
+    try {
+        video.srcObject = stream;
+        video.setAttribute('playsinline', '');
+        video.muted = true;
+        await video.play();
+        read = await reader();
+    } catch (error) {
+        stop();
+        throw error;
+    }
     const next = async () => {
-        if (stopped) return;
-        const text = await read(video);
-        if (stopped) return;
-        if (text !== null) {
+        if (signal.aborted) return;
+        const text = await read(video).catch(() => null);
+        if (signal.aborted) return;
+        if (text !== null && found(text)) {
             stop();
-            found(text);
             return;
         }
         setTimeout(next, 150);
     };
     void next();
-    return stop;
 }

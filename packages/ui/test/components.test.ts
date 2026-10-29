@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, assert, describe, it } from 'vitest';
-import type { GraphData, Run, SolutionData } from '../src/engine.js';
+import type { GraphData, Run, SolutionData, Solved } from '../src/engine.js';
+import { drawingOf } from '../src/graph/canvas.js';
 import '../src/index.js';
 import type { Arg2pFramework } from '../src/components/arg2p-framework.js';
 import type { Arg2pGraph } from '../src/components/arg2p-graph.js';
-import { listItems, type Arg2pSolutions } from '../src/components/arg2p-solutions.js';
+import type { Arg2pSolutions } from '../src/components/arg2p-solutions.js';
+import { listItems } from '../src/formats/terms.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
@@ -31,6 +33,11 @@ const ABSTRACT: GraphData = {
 
 function solution(result: SolutionData['result'], bindings: SolutionData['bindings'] = [], graph = GRAPH): SolutionData {
     return { result, query: 'q', bindings, error: result === 'halt' ? 'boom' : null, graph, branch: 3 };
+}
+
+// [graph] as the graph of a solution, with no stages to browse
+function shown(graph: GraphData): Solved {
+    return { solution: { ...solution('yes'), graph, branch: 0 }, run: null };
 }
 
 // A run of [solutions], each given when asked for
@@ -65,9 +72,9 @@ describe('<arg2p-graph>', function () {
     it('should draw every argument and attack, and the supports, each argument above what it is built on', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
         ok(graph.empty);
-        graph.graph = GRAPH;
+        graph.solution = shown(GRAPH);
         await graph.updateComplete;
-        const cy = graph.drawing!;
+        const cy = drawingOf(graph)!;
         deepEqual(cy.nodes().map(it => it.id()).sort(), ['A0', 'A1', 'A2']);
         ok(cy.getElementById('A2->A1').nonempty());
         ok(cy.getElementById('A0=>A1').hasClass('support'));
@@ -77,7 +84,7 @@ describe('<arg2p-graph>', function () {
 
     it('should hide the supports and show the conclusions when asked, and tell it', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
-        graph.graph = GRAPH;
+        graph.solution = shown(GRAPH);
         await graph.updateComplete;
         const toggles: unknown[] = [];
         graph.addEventListener('arg2p-toggle', event => toggles.push((event as CustomEvent).detail));
@@ -87,22 +94,22 @@ describe('<arg2p-graph>', function () {
         conclusions.checked = true;
         conclusions.dispatchEvent(new Event('change'));
         await graph.updateComplete;
-        ok(graph.drawing!.getElementById('A0=>A1').hasClass('hidden'));
-        equal(graph.drawing!.getElementById('A1').data('label'), 'A1\nflies(tweety)');
+        ok(drawingOf(graph)!.getElementById('A0=>A1').hasClass('hidden'));
+        equal(drawingOf(graph)!.getElementById('A1').data('text'), 'A1\nflies(tweety)');
         deepEqual(toggles.at(-1), { showSupports: false, showConclusions: true });
     });
 
     it('should tell about an argument tapped', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
-        graph.graph = GRAPH;
+        graph.solution = shown(GRAPH);
         await graph.updateComplete;
-        graph.drawing!.getElementById('A1').emit('tap');
+        drawingOf(graph)!.getElementById('A1').emit('tap');
         await graph.updateComplete;
         const popup = graph.shadowRoot!.querySelector('.popup')!;
         ok(popup.textContent!.includes('flies(tweety)'));
         ok(popup.textContent!.includes('r1'));
         ok(popup.textContent!.includes('rebut'));
-        graph.drawing!.emit('tap');
+        drawingOf(graph)!.emit('tap');
         await graph.updateComplete;
         equal(graph.shadowRoot!.querySelector('.popup'), null);
     });
@@ -110,19 +117,19 @@ describe('<arg2p-graph>', function () {
     it('should browse the stages of a computation, keeping the arguments in place', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
         const stage: GraphData = { ...GRAPH, arguments: GRAPH.arguments.slice(0, 1), attacks: [] };
-        graph.showSolution(solution('yes'), run([], new Map([[2, stage]])));
+        graph.solution = { solution: solution('yes'), run: run([], new Map([[2, stage]])) };
         await graph.updateComplete;
-        const where = graph.drawing!.getElementById('A0').position().x;
+        const where = drawingOf(graph)!.getElementById('A0').position().x;
         equal(graph.shadowRoot!.querySelector('.stage')!.textContent, 'Stage 3 / 3');
         graph.shadowRoot!.querySelector<HTMLButtonElement>('.previous')!.click();
         await settled();
         await graph.updateComplete;
         equal(graph.shadowRoot!.querySelector('.stage')!.textContent, 'Stage 2 / 3');
-        deepEqual(graph.drawing!.nodes().map(it => it.id()), ['A0']);
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.id()), ['A0']);
         graph.shadowRoot!.querySelector<HTMLButtonElement>('.next')!.click();
         await graph.updateComplete;
         equal(graph.shadowRoot!.querySelector('.stage')!.textContent, 'Stage 3 / 3');
-        equal(graph.drawing!.getElementById('A0').position().x, where);
+        equal(drawingOf(graph)!.getElementById('A0').position().x, where);
     });
 
     it('should place an abstract framework as its drawing does, and tell where its arguments are', async function () {
@@ -130,28 +137,79 @@ describe('<arg2p-graph>', function () {
         const told: Record<string, { x: number; y: number }>[] = [];
         graph.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
         graph.positions = { a: { x: 5, y: 6 }, b: { x: 100, y: 6 }, x: { x: 50, y: 90 } };
-        graph.graph = ABSTRACT;
+        graph.solution = shown(ABSTRACT);
         await graph.updateComplete;
-        deepEqual(graph.drawing!.getElementById('A1').position(), { x: 100, y: 6 });
+        deepEqual(drawingOf(graph)!.getElementById('A1').position(), { x: 100, y: 6 });
         equal(told.length, 0);
         // moved by the drawing
         graph.positions = { a: { x: 5, y: 6 }, b: { x: 200, y: 6 }, x: { x: 50, y: 90 } };
         await graph.updateComplete;
-        deepEqual(graph.drawing!.getElementById('A1').position(), { x: 200, y: 6 });
+        deepEqual(drawingOf(graph)!.getElementById('A1').position(), { x: 200, y: 6 });
         // a graph with no positions lays itself out, and tells
         const other = await element<Arg2pGraph>('arg2p-graph');
         other.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
-        other.graph = ABSTRACT;
+        other.solution = shown(ABSTRACT);
         await other.updateComplete;
         deepEqual(Object.keys(told.at(-1)!).sort(), ['a', 'b', 'x']);
     });
 
+    it('should keep the stage drawn when another cannot be read', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        const stopped = { name: 'Stopped', message: 'stopped', syntax: null, stopped: true };
+        graph.solution = { solution: solution('yes'), run: { graphAt: () => Promise.reject(stopped) } };
+        await graph.updateComplete;
+        graph.shadowRoot!.querySelector<HTMLButtonElement>('.previous')!.click();
+        await settled();
+        await graph.updateComplete;
+        equal(graph.shadowRoot!.querySelector('.stage')!.textContent, 'Stage 3 / 3');
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.id()).sort(), ['A0', 'A1', 'A2']);
+    });
+
+    it('should leave the positions it is given as they are, and tell where the arguments are dragged', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        const told: Record<string, { x: number; y: number }>[] = [];
+        graph.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
+        const given = { a: { x: 5, y: 6 }, b: { x: 100, y: 6 } };
+        graph.positions = given;
+        graph.solution = shown(ABSTRACT);
+        await graph.updateComplete;
+        // x was laid out, and told
+        deepEqual(Object.keys(told.at(-1)!).sort(), ['a', 'b', 'x']);
+        drawingOf(graph)!.getElementById('A0').position({ x: 40, y: 40 }).emit('dragfree');
+        deepEqual(told.at(-1)!.a, { x: 40, y: 40 });
+        equal(graph.positions, given);
+    });
+
+    it('should draw again once put back in a page', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        graph.solution = shown(GRAPH);
+        await graph.updateComplete;
+        graph.remove();
+        equal(drawingOf(graph), null);
+        document.body.appendChild(graph);
+        await graph.updateComplete;
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.id()).sort(), ['A0', 'A1', 'A2']);
+        drawingOf(graph)!.getElementById('A1').emit('tap');
+        await graph.updateComplete;
+        ok(graph.shadowRoot!.querySelector('.popup')!.textContent!.includes('flies(tweety)'));
+    });
+
+    it('should colour the arguments by their labels, in the colours the page sets once restyled', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        graph.solution = shown(GRAPH);
+        await graph.updateComplete;
+        equal(drawingOf(graph)!.getElementById('A1').data('color'), '#800000');
+        graph.style.setProperty('--_out', '#ff0000');
+        graph.restyle();
+        equal(drawingOf(graph)!.getElementById('A1').data('color'), '#ff0000');
+    });
+
     it('should name the arguments of an abstract framework as the theory does', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
-        graph.graph = ABSTRACT;
+        graph.solution = shown(ABSTRACT);
         await graph.updateComplete;
-        deepEqual(graph.drawing!.nodes().map(it => it.data('label')), ['a', 'b', 'x']);
-        equal(graph.drawing!.edges('.support').length, 0);
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.data('text')), ['a', 'b', 'x']);
+        equal(drawingOf(graph)!.edges('.support').length, 0);
         // no supports nor conclusions to show
         equal(graph.shadowRoot!.querySelectorAll('input[type=checkbox]').length, 0);
     });
@@ -242,7 +300,7 @@ describe('<arg2p-framework>', function () {
 
     it('should draw what the theory declares, and what its graph derives, dashed', async function () {
         const { editor } = await framework();
-        const cy = editor.drawing!;
+        const cy = drawingOf(editor)!;
         deepEqual(cy.nodes().map(it => it.id()), ['a', 'b']);
         deepEqual(cy.edges().map(it => it.id()), ['a->b']);
         editor.graph = ABSTRACT;
@@ -254,7 +312,7 @@ describe('<arg2p-framework>', function () {
 
     it('should write the arguments and attacks drawn into the theory', async function () {
         const { editor, theories } = await framework();
-        const cy = editor.drawing!;
+        const cy = drawingOf(editor)!;
         const [, argument, attack] = editor.shadowRoot!.querySelectorAll<HTMLButtonElement>('.bar button');
         argument.click();
         await editor.updateComplete;
@@ -267,14 +325,13 @@ describe('<arg2p-framework>', function () {
         cy.getElementById('a').emit('tap');
         await editor.updateComplete;
         equal(theories.at(-1), THEORY.replace('a -> b.', 'a -> b.\na1.\na1 -> a.').replace('a1.\n', 'a1.\n'));
-        deepEqual(editor.framework().attacks.at(-1), { from: 'a1', to: 'a' });
     });
 
     it('should delete what is selected, and only what is declared', async function () {
         const { editor, theories } = await framework();
         editor.graph = ABSTRACT;
         await editor.updateComplete;
-        const cy = editor.drawing!;
+        const cy = drawingOf(editor)!;
         cy.getElementById('b').select();
         cy.getElementById('x').select();
         await editor.updateComplete;
@@ -286,7 +343,7 @@ describe('<arg2p-framework>', function () {
 
     it('should rename an argument, where the theory declares it', async function () {
         const { editor, theories } = await framework();
-        editor.drawing!.getElementById('b').emit('dbltap');
+        drawingOf(editor)!.getElementById('b').emit('dbltap');
         await editor.updateComplete;
         const box = editor.shadowRoot!.querySelector<HTMLInputElement>('.rename')!;
         box.value = 'bee';
@@ -295,27 +352,27 @@ describe('<arg2p-framework>', function () {
         box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
         await editor.updateComplete;
         equal(theories.at(-1), THEORY.replace('b.\na -> b.', 'bee.\na -> bee.'));
-        ok(editor.drawing!.getElementById('bee').nonempty());
+        ok(drawingOf(editor)!.getElementById('bee').nonempty());
     });
 
     it('should tell about an argument tapped: its label, what attacks it, what it attacks', async function () {
         const { editor } = await framework();
         editor.graph = ABSTRACT;
         await editor.updateComplete;
-        editor.drawing!.getElementById('b').emit('tap');
+        drawingOf(editor)!.getElementById('b').emit('tap');
         await editor.updateComplete;
         const popup = editor.shadowRoot!.querySelector('.popup')!.textContent!.replace(/\s+/g, ' ');
         ok(popup.includes('out'), popup);
         ok(/Attacked by ?a ?x/.test(popup), popup);
         ok(/Attacks ?none/.test(popup), popup);
-        editor.drawing!.emit('tap');
+        drawingOf(editor)!.emit('tap');
         await editor.updateComplete;
         equal(editor.shadowRoot!.querySelector('.popup'), null);
     });
 
     it('should bend mutual attacks apart, so that both show', async function () {
         const { editor } = await framework('graphBuildMode(abstract).\na <-> b.\nb -> c.\n');
-        const cy = editor.drawing!;
+        const cy = drawingOf(editor)!;
         ok(cy.getElementById('a->b').hasClass('mutual'));
         ok(cy.getElementById('b->a').hasClass('mutual'));
         equal(cy.getElementById('b->c').hasClass('mutual'), false);
@@ -327,7 +384,7 @@ describe('<arg2p-framework>', function () {
         editor.addEventListener('arg2p-positions', event => told.push((event as CustomEvent).detail.positions));
         editor.positions = { a: { x: 10, y: 20 }, b: { x: 300, y: 40 } };
         await editor.updateComplete;
-        deepEqual(editor.drawing!.getElementById('b').position(), { x: 300, y: 40 });
+        deepEqual(drawingOf(editor)!.getElementById('b').position(), { x: 300, y: 40 });
         // an argument added by text goes next to the others, and is told
         editor.theory = `${THEORY}c.\n`;
         await editor.updateComplete;
@@ -341,16 +398,43 @@ describe('<arg2p-framework>', function () {
         await editor.updateComplete;
         editor.theory = `${THEORY}c.\n`;
         await editor.updateComplete;
-        equal(editor.graph, null);
-        equal(editor.drawing!.getElementById('x').nonempty(), false);
+        equal(drawingOf(editor)!.getElementById('x').nonempty(), false);
+    });
+
+    it('should tell about an argument tapped when read only, and keep the arguments where they are', async function () {
+        const { editor } = await framework();
+        editor.readonly = true;
+        editor.graph = ABSTRACT;
+        await editor.updateComplete;
+        drawingOf(editor)!.getElementById('b').emit('tap');
+        await editor.updateComplete;
+        ok(editor.shadowRoot!.querySelector('.popup')!.textContent!.includes('out'));
+        equal(editor.shadowRoot!.querySelectorAll('.bar button').length, 1);
+        ok(drawingOf(editor)!.autoungrabify());
+        // still so once put back in a page
+        editor.remove();
+        document.body.appendChild(editor);
+        await editor.updateComplete;
+        ok(drawingOf(editor)!.autoungrabify());
+        deepEqual(drawingOf(editor)!.nodes().map(it => it.id()), ['a', 'b', 'x']);
+    });
+
+    it('should colour the arguments again in the colours the page sets', async function () {
+        const { editor } = await framework();
+        editor.graph = ABSTRACT;
+        await editor.updateComplete;
+        equal(drawingOf(editor)!.getElementById('b').data('color'), '#800000');
+        editor.style.setProperty('--_out', '#ff0000');
+        editor.restyle();
+        equal(drawingOf(editor)!.getElementById('b').data('color'), '#ff0000');
     });
 
     it('should draw a theory edited as text, the arguments kept where they were', async function () {
         const { editor } = await framework();
-        const where = { ...editor.drawing!.getElementById('a').position() };
+        const where = { ...drawingOf(editor)!.getElementById('a').position() };
         editor.theory = `${THEORY}c.\nc -> a.\n`;
         await editor.updateComplete;
-        deepEqual(editor.drawing!.getElementById('a').position(), where);
-        ok(editor.drawing!.getElementById('c->a').nonempty());
+        deepEqual(drawingOf(editor)!.getElementById('a').position(), where);
+        ok(drawingOf(editor)!.getElementById('c->a').nonempty());
     });
 });

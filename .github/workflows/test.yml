@@ -13,11 +13,11 @@ jobs:
   
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
@@ -31,7 +31,7 @@ jobs:
           npm run build
       - name: Deploy
         if: github.ref_name == 'master'
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@v4.9.0
         with:
           folder: packages/playground/dist
   # @tuprolog/arg2p-ui on npm, from master, when its version is not published yet, with its provenance: npmjs.com
@@ -47,11 +47,11 @@ jobs:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 22
+          node-version: 26
           registry-url: https://registry.npmjs.org
       - name: Set up npm for trusted publishing
         run: npm install --global npm@11.21.0

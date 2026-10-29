@@ -4,13 +4,14 @@ import { Text } from '@codemirror/state';
 import { runScopeHandlers } from '@codemirror/view';
 import { afterEach, assert, describe, it } from 'vitest';
 import '../src/index.js';
-import { rangeOf, type Arg2pEditor } from '../src/components/arg2p-editor.js';
+import type { Arg2pEditor } from '../src/components/arg2p-editor.js';
+import { rangeOf, viewOf } from '../src/editor/view.js';
 import type { SyntaxProblem } from '../src/engine.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
 
-async function editor(kind: 'theory' | 'query', value: string, problem: SyntaxProblem | null = null) {
+async function editor(kind: 'theory' | 'query', value: string, problem: SyntaxProblem | null = null, check = (_: string) => Promise.resolve(problem)) {
     const element = document.createElement('arg2p-editor') as Arg2pEditor;
     const checked: string[] = [];
     element.kind = kind;
@@ -19,7 +20,7 @@ async function editor(kind: 'theory' | 'query', value: string, problem: SyntaxPr
     element.engine = {
         check: text => {
             checked.push(text);
-            return Promise.resolve(problem);
+            return check(text);
         },
     };
     document.body.appendChild(element);
@@ -28,7 +29,7 @@ async function editor(kind: 'theory' | 'query', value: string, problem: SyntaxPr
     for (const type of ['arg2p-change', 'arg2p-submit']) {
         element.addEventListener(type, event => events.push({ type, value: (event as CustomEvent).detail.value }));
     }
-    return { element, view: element.editor!, checked, events };
+    return { element, view: viewOf(element)!, checked, events };
 }
 
 const settled = (ms = 50) => new Promise(resolve => setTimeout(resolve, ms));
@@ -80,6 +81,49 @@ describe('<arg2p-editor>', function () {
         await element.updateComplete;
         ok(element.shadowRoot!.querySelector('.problem')!.textContent!.includes('Unexpected end of file'));
         equal(view.state.selection.main.head, 7);
+    });
+
+    it('should leave a problem as it is when the text changed while it was checked, or one was reported', async function () {
+        const answers: ((problem: SyntaxProblem | null) => void)[] = [];
+        const { element, view } = await editor('theory', 'a :=> b(.', null, () => new Promise(resolve => answers.push(resolve)));
+        forceLinting(view);
+        await settled();
+        // a problem found by running, while the check is under way
+        element.report({ line: 1, column: 9, length: 1, message: 'Unexpected end of file' });
+        answers[0](null);
+        await settled();
+        await element.updateComplete;
+        ok(element.shadowRoot!.querySelector('.problem')!.textContent!.includes('Unexpected end of file'));
+        // the text changed, while another check is under way
+        view.dispatch({ changes: { from: 0, insert: '% x\n' } });
+        forceLinting(view);
+        await settled();
+        view.dispatch({ changes: { from: 0, insert: '% y\n' } });
+        answers[1]({ line: 1, column: 2, length: 1, message: 'stale' });
+        await settled();
+        await element.updateComplete;
+        equal(element.shadowRoot!.querySelector('.problem')!.textContent!.includes('stale'), false);
+    });
+
+    it('should follow its kind and its label once drawn', async function () {
+        const { element, view, events } = await editor('theory', 'flies(X)');
+        equal(view.contentDOM.getAttribute('aria-label'), 'Theory');
+        element.kind = 'query';
+        element.label = 'Query';
+        await element.updateComplete;
+        equal(view.contentDOM.getAttribute('aria-label'), 'Query');
+        runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Enter' }), 'editor');
+        deepEqual(events.at(-1), { type: 'arg2p-submit', value: 'flies(X)' });
+    });
+
+    it('should edit its value again once put back in a page', async function () {
+        const { element } = await editor('theory', 'a :=> b.');
+        element.remove();
+        equal(viewOf(element), null);
+        element.value = 'c :=> d.';
+        document.body.appendChild(element);
+        await element.updateComplete;
+        equal(viewOf(element)!.state.doc.toString(), 'c :=> d.');
     });
 
     it('should place a problem within the text', function () {

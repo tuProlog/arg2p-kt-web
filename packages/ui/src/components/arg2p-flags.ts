@@ -1,8 +1,9 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine } from '../engine.js';
-import { DEFAULT_PROFILE, DEFAULTS, FLAG_GROUPS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
-import { statedFlags, statedProfile, withNone, withSwitch, withValues, without } from '../flags/text.js';
+import { DEFAULT_PROFILE, DEFAULTS, FLAG_GROUPS, FLAGS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
+import { statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
 import { tokens } from '../theme.js';
+import { define, emit } from './shared.js';
 
 // How long the flags and the theory are let be before the engine is asked what is in effect
 const SETTLE = 250;
@@ -35,8 +36,14 @@ export class Arg2pFlags extends LitElement {
     engine: Pick<Engine, 'settings'> | null = null;
 
     private settings: Settings | null = null;
+    // what the theory and the flags state, read once they change
+    private stated: { theory: Stated; flags: Stated } = { theory: new Map(), flags: new Map() };
     private timer: ReturnType<typeof setTimeout> | undefined;
     private asked = 0;
+
+    protected override willUpdate(changed: PropertyValues): void {
+        if (changed.has('theory') || changed.has('flags')) this.stated = { theory: statedFlags(this.theory), flags: statedFlags(this.flags) };
+    }
 
     protected override updated(changed: PropertyValues): void {
         if (changed.has('flags') || changed.has('theory') || changed.has('engine')) this.ask();
@@ -72,10 +79,10 @@ export class Arg2pFlags extends LitElement {
         }, SETTLE);
     }
 
-    /** The values in effect of [flag], and where they come from */
-    effective(flag: Pick<Flag, 'name'>): { values: readonly string[]; source: Source } {
-        const fromTheory = statedFlags(this.theory).get(flag.name);
-        const fromFlags = statedFlags(this.flags).get(flag.name);
+    // The values in effect of [flag], and where they come from
+    private effective(flag: Pick<Flag, 'name'>): { values: readonly string[]; source: Source } {
+        const fromTheory = this.stated.theory.get(flag.name);
+        const fromFlags = this.stated.flags.get(flag.name);
         const fallback = DEFAULTS[flag.name] ?? [];
         const values = this.settings?.[flag.name] ?? fromTheory ?? fromFlags ?? fallback;
         const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && [...a].sort().every((it, i) => it === [...b].sort()[i]);
@@ -95,7 +102,7 @@ export class Arg2pFlags extends LitElement {
 
     private change(flags: string): void {
         this.flags = flags;
-        this.dispatchEvent(new CustomEvent('arg2p-flags-change', { detail: { flags }, bubbles: true, composed: true }));
+        emit(this, 'arg2p-flags-change', { flags });
     }
 
     private set(flag: Flag, values: readonly string[]): void {
@@ -105,12 +112,9 @@ export class Arg2pFlags extends LitElement {
         else this.change(withValues(this.flags, flag.name, values));
     }
 
-    /** What the panel finds wrong with the flags in effect */
-    warnings(): string[] {
-        const all = FLAG_GROUPS.flatMap(group => group.flags);
-        const warnings = all
-            .filter(flag => flag.required && this.effective(flag).values.length === 0)
-            .map(flag => `${flag.label} has no value: the solver needs one.`);
+    // What the panel finds wrong with the flags in effect
+    private warnings(): string[] {
+        const warnings = FLAGS.filter(flag => flag.required && this.effective(flag).values.length === 0).map(flag => `${flag.label} has no value: the solver needs one.`);
         const value = (name: string) => this.effective({ name }).values[0];
         if (value('orderingComparator') === 'normal' && value('orderingPrinciple') === 'weakest') {
             warnings.push('The normal comparator goes with the last link alone: with the weakest link the evaluation raises an error.');
@@ -168,7 +172,7 @@ export class Arg2pFlags extends LitElement {
     private flag(flag: Flag) {
         const { values, source } = this.effective(flag);
         const locked = source === 'theory';
-        const stated = statedFlags(this.flags).has(flag.name);
+        const stated = this.stated.flags.has(flag.name);
         const id = `flag-${flag.name}`;
         let control;
         if (flag.kind === 'switch') {
@@ -370,7 +374,7 @@ export class Arg2pFlags extends LitElement {
     ];
 }
 
-customElements.define('arg2p-flags', Arg2pFlags);
+define('arg2p-flags', Arg2pFlags);
 
 declare global {
     interface HTMLElementTagNameMap {

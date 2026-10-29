@@ -2,3 +2,4 @@
 // components: the worker brings the solver with it, the page does not load it)
 export { JsEngine, type Channel } from './engine.js';
 export type { Request, Answer } from './host.js';
+export { graphData } from './graph.js';

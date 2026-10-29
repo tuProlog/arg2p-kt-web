@@ -1,3 +1,4 @@
+import { ATOM } from './atoms.js';
 import type { Framework } from './frameworks.js';
 
 // The arguments and attacks a theory of the profile abstract declares, as written in it (`a.`, `arg(a).`, `a -> b.`,
@@ -16,7 +17,7 @@ type Declaration =
     | { readonly kind: 'attack'; readonly from: string; readonly to: string; readonly form: 'arrow' | 'att' }
     | { readonly kind: 'mutual'; readonly a: string; readonly b: string };
 
-const NAME = '([a-z][a-zA-Z0-9_]*)';
+const NAME = `(${ATOM})`;
 const ARGUMENT_FACT = new RegExp(`^${NAME}$`);
 const ARGUMENT_ARG = new RegExp(`^arg\\s*\\(\\s*${NAME}\\s*\\)$`);
 const ATTACK_ARROW = new RegExp(`^${NAME}\\s*->\\s*${NAME}$`);
