@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine } from '../engine.js';
-import { DEFAULT_PROFILE, DEFAULTS, FLAG_GROUPS, FLAGS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
-import { statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
+import { DEFAULTS, FLAG_GROUPS, FLAGS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
+import { profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
 import { tokens } from '../theme.js';
 import { define, emit } from './shared.js';
 
@@ -95,9 +95,8 @@ export class Arg2pFlags extends LitElement {
     }
 
     private profile(): { name: string; source: Source } {
-        const fromTheory = statedProfile(this.theory);
-        const name = this.settings?.graphBuildMode?.[0] ?? fromTheory ?? statedProfile(this.flags) ?? DEFAULT_PROFILE;
-        return { name, source: fromTheory !== null ? 'theory' : statedProfile(this.flags) !== null ? 'flags' : 'default' };
+        const name = profileOf(this.theory, this.flags, this.settings);
+        return { name, source: statedProfile(this.theory) !== null ? 'theory' : statedProfile(this.flags) !== null ? 'flags' : 'default' };
     }
 
     private change(flags: string): void {

@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine, EngineError, SolveRequest, Solved } from '../engine.js';
-import { DEFAULT_PROFILE, profileInfo } from '../flags/schema.js';
-import { statedProfile } from '../flags/text.js';
+import { profileInfo } from '../flags/schema.js';
+import { profileOf } from '../flags/text.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
 import './arg2p-editor.js';
@@ -212,9 +212,9 @@ export class Arg2pSolver extends LitElement {
         return [...this.children].filter((it): it is HTMLElement => it instanceof HTMLElement && it.slot === 'tab' && it.id !== '');
     }
 
-    // The profile the theory is read in: the one it states, or the flags, or the default
+    // The profile the theory is read in, as its texts state it: the one it states, or the flags, or the default
     private get profile(): string {
-        return statedProfile(this.theory) ?? statedProfile(this.flags) ?? DEFAULT_PROFILE;
+        return profileOf(this.theory, this.flags);
     }
 
     private get abstract(): boolean {
