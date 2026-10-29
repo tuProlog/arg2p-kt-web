@@ -86,6 +86,10 @@ jobs:
     needs:
       - test
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # one publication at a time: the run of a later push waits for that of an earlier one, rather than racing it
+    concurrency:
+      group: publish-ui
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -119,7 +123,14 @@ jobs:
         if: steps.version.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish -w @tuprolog/arg2p-ui --access public --provenance
+        # a version npm has from another run, which it may not tell yet, is published: not a failure
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! npm publish -w @tuprolog/arg2p-ui --access public --provenance 2>&1 | tee publish.log; then
+            grep -q -E 'E409|EPUBLISHCONFLICT|previously (published|staged)' publish.log || exit 1
+            echo "@tuprolog/arg2p-ui is on npm already, published by another run"
+          fi
   success:
     # named apart in the runs that test nothing (a pull request from a branch of this repository, tested by its push),
     # so that their check, skipped, never stands for the required one
