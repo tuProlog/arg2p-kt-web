@@ -272,12 +272,14 @@ export class Arg2pSolutions extends LitElement {
                 font-weight: bold;
                 text-transform: uppercase;
                 letter-spacing: 0.04em;
-                color: #ffffff;
+                color: var(--_surface);
                 background: var(--_accent);
                 border-radius: 4px;
                 padding: 1px 6px;
             }
+            /* the yellow of no is the same in every theme: dark is written on it */
             .no .badge {
+                color: #212529;
                 background: var(--_no);
             }
             .halt .badge {

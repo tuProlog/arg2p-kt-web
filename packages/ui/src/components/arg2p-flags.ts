@@ -338,7 +338,7 @@ export class Arg2pFlags extends LitElement {
                 border-color: var(--_accent);
             }
             .badge.theory {
-                color: #ffffff;
+                color: var(--_surface);
                 background: var(--_accent);
                 border-color: var(--_accent);
             }

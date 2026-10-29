@@ -426,7 +426,7 @@ export class Arg2pSolver extends LitElement {
                 padding: 5px 16px;
             }
             .run {
-                color: #ffffff;
+                color: var(--_surface);
                 background: var(--_accent);
                 border-color: var(--_accent);
             }
