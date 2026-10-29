@@ -2,82 +2,138 @@ name: Run Tests
 
 on:
   push:
+  # the pull requests of forks, which no push of this repository tests
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to a branch, or to a pull request, cancels the run going on for it; the runs of master go to the end, as
+# they deploy and publish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   test:
+    # a pull request from a branch of this repository is tested by the push of its branch
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-  
+
     strategy:
       matrix:
         node-version: [22]
-  
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Node.js
         uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
       - name: Install dependencies
-        run: |
-          npm install
+        run: npm ci --no-audit --no-fund
+      # the components built, every package type-checked and tested
       - name: Run tests
-        run: |
-          npm test
-      - name: Build
-        run: |
-          npm run build
+        run: npm test
+      # the components are built already
+      - name: Build the playground
+        run: npm run build -w @tuprolog/arg2p-playground
+      - name: Keep the playground, to deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: playground
+          path: packages/playground/dist
+          retention-days: 1
+      - name: Keep the components, to publish
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: components
+          path: packages/ui/dist
+          retention-days: 1
+  # The playground on GitHub Pages (the branch gh-pages), from master, one deploy at a time
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+      - name: Get the playground built
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: playground
+          path: packages/playground/dist
       - name: Deploy
-        if: github.ref_name == 'master'
         uses: JamesIves/github-pages-deploy-action@v4.9.0
         with:
           folder: packages/playground/dist
   # @tuprolog/arg2p-ui on npm, from master, when its version is not published yet, with its provenance: npmjs.com
   # trusts this workflow as its publisher (trusted publishing, which needs npm 11.5.1 or later), or else the token of
-  # the secret NPM_TOKEN serves (the first version, before the package exists to trust anything)
+  # the secret NPM_TOKEN serves (the first version, before the package exists to trust anything). The components are
+  # those the tests built: publishing them needs no dependency installed.
   publish-ui:
     runs-on: ubuntu-latest
     needs:
       - test
-    if: github.ref_name == 'master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
+      - name: Tell whether the version of the components is published
+        id: version
+        run: |
+          version=$(node -p "require('./packages/ui/package.json').version")
+          if npm view "@tuprolog/arg2p-ui@$version" version > /dev/null 2>&1; then
+            echo "@tuprolog/arg2p-ui $version is on npm already"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set up Node.js
+        if: steps.version.outputs.published != 'true'
         uses: actions/setup-node@v7.1.0
         with:
           node-version: 26
           registry-url: https://registry.npmjs.org
       - name: Set up npm for trusted publishing
+        if: steps.version.outputs.published != 'true'
         run: npm install --global npm@11.21.0
+      - name: Get the components built
+        if: steps.version.outputs.published != 'true'
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: components
+          path: packages/ui/dist
       - name: Publish the components
+        if: steps.version.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          version=$(node -p "require('./packages/ui/package.json').version")
-          if npm view "@tuprolog/arg2p-ui@$version" version > /dev/null 2>&1; then
-            echo "@tuprolog/arg2p-ui $version is on npm already"
-            exit 0
-          fi
-          npm install
-          npm run build -w @tuprolog/arg2p-ui
-          npm publish -w @tuprolog/arg2p-ui --access public --provenance
+        run: npm publish -w @tuprolog/arg2p-ui --access public --provenance
   success:
+    # named apart in the runs that test nothing (a pull request from a branch of this repository, tested by its push),
+    # so that their check, skipped, never stands for the required one
+    name: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && 'success' || 'success (tested on push)' }}
     runs-on: ubuntu-26.04
     needs:
       - test
+      - deploy
       - publish-ui
     if: >-
-      always() && (
+      always() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && (
         contains(join(needs.*.result, ','), 'failure')
         || !contains(join(needs.*.result, ','), 'cancelled')
       )
     steps:
       - name: Verify that there were no failures
         run: ${{ !contains(join(needs.*.result, ','), 'failure') }}
-        
