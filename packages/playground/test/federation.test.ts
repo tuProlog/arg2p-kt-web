@@ -54,11 +54,12 @@ describe('The links of a pairing', function () {
 });
 
 describe('The devices of a federation', function () {
-    // as a cluster paired with another tells them: its own site, its Web Workers, the other device, and one beyond it
+    // as a cluster paired with another tells them: its own site (its Web Workers included), its Web Workers, the other
+    // device, and one beyond it
     const stats: FederationStats = {
         site: 'site-a',
         sites: [
-            { id: 'site-a', workers: 0, delegate: false, via: null },
+            { id: 'site-a', workers: 2, delegate: false, via: null },
             { id: 'site-a1', workers: 1, delegate: true, via: null },
             { id: 'site-a2', workers: 1, delegate: true, via: null },
             { id: 'site-b', workers: 4, delegate: false, via: null },
@@ -67,7 +68,7 @@ describe('The devices of a federation', function () {
         evaluation: null,
     };
 
-    it('should tell this device first, with the workers of its Web Workers, then the others', function () {
+    it('should tell this device first, then the others', function () {
         deepEqual(devicesOf(stats), [
             { id: 'site-a', name: 'This device', workers: 2, via: null },
             { id: 'site-b', name: 'Device 1', workers: 4, via: null },

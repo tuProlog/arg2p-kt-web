@@ -81,17 +81,16 @@ export interface Device {
     readonly via: string | null;
 }
 
-/** The devices of [stats]: this one first (its workers, on its Web Workers), then the others */
+/** The devices of [stats]: this one first, then the others (the Web Workers of each are among its workers) */
 export function devicesOf(stats: FederationStats): Device[] {
-    const delegates = stats.sites.filter(it => it.delegate);
-    const self = stats.sites.find(it => it.id === stats.site);
-    const own = (self?.workers ?? 0) + delegates.reduce((sum, it) => sum + (it.workers ?? 0), 0);
-    const others = stats.sites.filter(it => !it.delegate && it.id !== stats.site);
+    const devices = stats.sites.filter(it => !it.delegate);
     const name = (id: string) => deviceName(stats, id);
-    return [
-        { id: stats.site, name: name(stats.site), workers: own, via: null },
-        ...others.map(it => ({ id: it.id, name: name(it.id), workers: it.workers, via: it.via === null ? null : name(it.via) })),
-    ];
+    return [...devices.filter(it => it.id === stats.site), ...devices.filter(it => it.id !== stats.site)].map(it => ({
+        id: it.id,
+        name: name(it.id),
+        workers: it.workers,
+        via: it.via === null ? null : name(it.via),
+    }));
 }
 
 /** The device the site [id] of [stats] is on: this one for its Web Workers, another by its rank, or the site itself */
