@@ -1,5 +1,5 @@
 import type { Core, EventObject, StylesheetJson } from 'cytoscape';
-import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
+import { css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
 import { emit } from '../events.js';
 import { isAtom } from '../formats/atoms.js';
@@ -9,6 +9,7 @@ import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
 import { attackId, isAbstract, nameOf } from '../graph/drawing.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
+import { CanvasElement, canvasStyles } from './canvas-element.js';
 import { popup, popupStyles, type AttackShown } from './popup.js';
 import { buttons, chips, define } from './shared.js';
 
@@ -45,7 +46,7 @@ const STYLE: StylesheetJson = [
  * Events: `arg2p-theory-change` with the theory, after every change made by drawing; `arg2p-positions` with where the
  * arguments are, as they are laid out or dragged; `arg2p-export` with the picture of the framework, as for the graph.
  */
-export class Arg2pFramework extends LitElement {
+export class Arg2pFramework extends CanvasElement {
     static override properties = {
         theory: {},
         graph: { attribute: false },
@@ -82,7 +83,7 @@ export class Arg2pFramework extends LitElement {
     private drawnAttacks: readonly Shown<{ from: string; to: string }>[] = [];
     private labels: ReadonlyMap<string, string> = new Map();
 
-    private readonly canvas = new Canvas(this, {
+    protected readonly canvas = new Canvas(this, {
         style: STYLE,
         redraw: () => this.draw(),
         setup: cy => this.listen(cy),
@@ -91,19 +92,8 @@ export class Arg2pFramework extends LitElement {
         locked: () => this.readonly,
     });
 
-    /** Fits the drawing to the element (after it was hidden, and so sized to nothing) */
-    fit(): void {
-        this.canvas.fit();
-    }
-
-    /** The framework as a PNG picture, as a data URL */
-    png(): string {
-        return this.canvas.png();
-    }
-
-    /** Draws the framework again, in the colours the page sets now (after a change of theme) */
-    restyle(): void {
-        this.canvas.restyle();
+    protected get blank(): boolean {
+        return this.drawnArguments.length === 0;
     }
 
     protected override willUpdate(changed: PropertyValues): void {
@@ -300,7 +290,7 @@ export class Arg2pFramework extends LitElement {
                           <button type="button" title="Delete what is selected (Del)" ?disabled=${!this.selected} @click=${() => this.deleteSelected()}>Delete</button>
                           <span class="hint">${hint}</span>
                       `}
-                <button type="button" class="png" title="Download the framework as a picture" @click=${() => this.canvas.export(this.fileName)}>PNG</button>
+                ${this.renderPng('framework')}
             </div>
             <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
                 <div class="canvas"></div>
@@ -356,21 +346,10 @@ export class Arg2pFramework extends LitElement {
         buttons,
         chips,
         popupStyles,
+        canvasStyles,
         css`
-            :host {
-                display: flex;
-                flex-direction: column;
-                min-height: 200px;
-                background: var(--_surface);
-                font-size: 13px;
-            }
             .bar {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
                 gap: 6px;
-                padding: 6px 10px;
-                border-bottom: 1px solid var(--_border);
             }
             button.active {
                 border-color: var(--_accent);
@@ -387,15 +366,7 @@ export class Arg2pFramework extends LitElement {
                 margin-left: 0;
             }
             .area {
-                flex: 1;
-                min-height: 0;
-                position: relative;
-                overflow: hidden;
                 outline: none;
-            }
-            .canvas {
-                position: absolute;
-                inset: 0;
             }
             .legend {
                 position: absolute;

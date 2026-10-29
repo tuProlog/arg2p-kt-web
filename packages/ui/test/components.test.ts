@@ -321,6 +321,19 @@ describe('<arg2p-framework>', function () {
         equal(cy.getElementById('a').hasClass('derived'), false);
     });
 
+    it('should save a picture once something is drawn, as the graph does', async function () {
+        const { editor } = await framework('graphBuildMode(abstract).\n');
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        const png = (it: HTMLElement) => it.shadowRoot!.querySelector<HTMLButtonElement>('.png')!;
+        ok(png(editor).disabled);
+        ok(png(graph).disabled);
+        editor.theory = THEORY;
+        graph.solution = shown(GRAPH);
+        await Promise.all([editor.updateComplete, graph.updateComplete]);
+        equal(png(editor).disabled, false);
+        equal(png(graph).disabled, false);
+    });
+
     it('should write the arguments and attacks drawn into the theory', async function () {
         const { editor, theories } = await framework();
         const cy = drawingOf(editor)!;
