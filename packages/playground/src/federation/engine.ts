@@ -32,10 +32,12 @@ export class ClusterEngine implements Engine {
         private readonly local: Engine,
     ) {}
 
-    async solve(request: SolveRequest): Promise<Run> {
+    async solve(request: SolveRequest, output: (text: string) => void = () => {}): Promise<Run> {
         const id = ++this.runs;
+        const syntax = await this.stoppable(this.problem(request));
+        if (syntax !== null) throw syntax;
         this.solver = await this.stoppable(this.start());
-        const run = await this.stoppable(this.solver.solve(request));
+        const run = await this.stoppable(this.solver.solve(request, text => id === this.runs && output(text)));
         let graph: GraphData = EMPTY_GRAPH;
         return {
             query: run.query,
@@ -56,6 +58,21 @@ export class ClusterEngine implements Engine {
 
     settings(theory: string, flags: string): Promise<Settings> {
         return this.local.settings(theory, flags);
+    }
+
+    // Where the theory, the flags or the query of [request] do not parse, as the engine of the page reads them, as the
+    // error of a run that cannot start; null if they all do
+    private async problem({ theory, flags, query }: SolveRequest): Promise<EngineError | null> {
+        const texts = [
+            { where: 'theory', text: theory, kind: 'theory', name: 'Theory error' },
+            { where: 'flags', text: flags, kind: 'theory', name: 'Flags error' },
+            { where: 'query', text: query, kind: 'query', name: 'Query error' },
+        ] as const;
+        const problems = await Promise.all(texts.map(it => this.local.check(it.text, it.kind)));
+        const at = problems.findIndex(it => it !== null);
+        if (at === -1) return null;
+        const problem = problems[at]!;
+        return { name: texts[at]!.name, message: problem.message, syntax: { ...problem, where: texts[at]!.where } };
     }
 
     stop(): void {

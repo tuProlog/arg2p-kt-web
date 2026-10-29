@@ -30,8 +30,11 @@ class FakeCluster implements ParallelSolver {
 
     constructor(private readonly solutions: SolutionData[], private readonly failure: unknown = null) {}
 
-    solve(request: SolveRequest): Promise<ParallelRun> {
+    private output: (text: string) => void = () => {};
+
+    solve(request: SolveRequest, output: (text: string) => void): Promise<ParallelRun> {
         this.requests.push(request);
+        this.output = output;
         if (this.failure !== null) return Promise.reject(this.failure);
         let next = 0;
         return Promise.resolve({
@@ -43,6 +46,11 @@ class FakeCluster implements ParallelSolver {
 
     stop(): void {
         this.stops++;
+    }
+
+    /** Prints [text], as the run going on */
+    print(text: string): void {
+        this.output(text);
     }
 
     go(): void {
@@ -86,6 +94,25 @@ describe('The engine of the parallel runs', function () {
         equal(await engine.check('ok.', 'theory'), null);
         equal((await engine.check('bad', 'query'))?.message, 'bad');
         deepEqual(await engine.settings('', ''), { queryMode: ['true'] });
+    });
+
+    it('should tell where the theory, the flags or the query do not parse, as the engine of the page reads them', async function () {
+        const cluster = new FakeCluster([solution('a')]);
+        const engine = new ClusterEngine(async () => cluster, local);
+        const error = await engine.solve({ ...REQUEST, flags: 'bad' }).then(() => null, (failure: EngineError) => failure);
+        deepEqual(error, { name: 'Flags error', message: 'bad', syntax: { line: 1, column: 1, length: 1, message: 'bad', where: 'flags' } });
+        deepEqual(cluster.requests, []);
+    });
+
+    it('should tell what the run prints, while it is the latest', async function () {
+        const printed: string[] = [];
+        const cluster = new FakeCluster([solution('a')]);
+        const engine = new ClusterEngine(async () => cluster, local);
+        await engine.solve(REQUEST, text => printed.push(text));
+        cluster.print('first');
+        await engine.solve(REQUEST);
+        cluster.print('second');
+        deepEqual(printed, ['first']);
     });
 
     it('should stop a run: what it waits for fails as stopped, and it has no more', async function () {

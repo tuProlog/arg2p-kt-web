@@ -16,9 +16,9 @@ export interface ParallelRun {
 
 /** What solves in parallel: a query on a theory with its flags, as the solver of the page would (see ClusterEngine) */
 export interface ParallelSolver {
-    /** The solutions of [request]: a rejected promise holds an EngineError */
-    solve(request: SolveRequest): Promise<ParallelRun>;
-    /** Stops the evaluation going on, if it can */
+    /** The solutions of [request]: a rejected promise holds an EngineError; what the solver prints goes to [output] */
+    solve(request: SolveRequest, output: (text: string) => void): Promise<ParallelRun>;
+    /** Stops the evaluation going on */
     stop(): void;
 }
 
