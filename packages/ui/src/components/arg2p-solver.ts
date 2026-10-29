@@ -28,7 +28,7 @@ interface HostTab {
 }
 
 /** The query the editor suggests: the labelling of the statements */
-const QUERY = 'buildLabelSets(In, Out, Und)';
+const QUERY = 'arg2p::solve(In, Out, Und)';
 
 /**
  * A solver of a theory: its query, run on an engine (Run, or Enter; Stop while it runs), and in tabs the solutions

@@ -23,7 +23,7 @@ engine.start();
 theory.engine = engine;
 solver.engine = engine;
 solver.flags = DEFAULT_FLAGS;
-solver.query = 'buildLabelSets(In, Out, Und)';
+solver.query = 'arg2p::solve(In, Out, Und)';
 
 const setTheory = (text: string) => {
     theory.value = text;
