@@ -63,7 +63,8 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.build.json && vite build --config vite.bundle.config.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json && vite build --config vite.bundle.config.ts",
     "check": "tsc --noEmit",
     "test": "vitest run"
   },
