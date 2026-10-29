@@ -184,6 +184,7 @@ framework.addEventListener('arg2p-positions', share);
 | --- | --- |
 | `@tuprolog/arg2p-ui` | Every component, and what they are built on |
 | `@tuprolog/arg2p-ui/solver`, `/graph`, `/framework`, `/solutions`, `/editor`, `/flags` | One component alone (the solver with those it is made of) |
+| `@tuprolog/arg2p-ui/solver.bundle` | The solver in one file, its dependencies within: for a page with no bundler, loading it from a CDN as it is (`https://cdn.jsdelivr.net/npm/@tuprolog/arg2p-ui@<version>/dist/bundle/solver.js`) |
 | `@tuprolog/arg2p-ui/data` | What the components are built on, with no DOM: the contract of engines, the flags and profiles, the formats of abstract frameworks (APX, TGF, ICCMA'23), the layout of graphs |
 | `@tuprolog/arg2p-ui/js` | The engine of the browser: it brings the solver with it; and `graphData`, a graph of @tuprolog/arg2p (of a cluster of its parallel solver, say) as the components read it |
 
