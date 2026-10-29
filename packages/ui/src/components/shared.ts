@@ -1,16 +1,11 @@
 import { css, html } from 'lit';
 
-// What the components have in common: how they are defined and tell what happens, and the look of their buttons and
-// of the chips of arguments.
+// What the components have in common: how they are defined (they tell what happens with emit, see events), and the
+// look of their buttons and of the chips of arguments.
 
 /** Defines [element] as [name], unless the page has it already (two copies of the components on one page) */
 export function define(name: string, element: CustomElementConstructor): void {
     if (customElements.get(name) === undefined) customElements.define(name, element);
-}
-
-/** Tells the page [type], with [detail]: the event crosses the components it is in */
-export function emit(element: HTMLElement, type: string, detail: unknown): boolean {
-    return element.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
 }
 
 /** [action] on Enter or Space, for what acts as a button without being one */

@@ -1,4 +1,5 @@
 import type { Core, NodeCollection, NodeSingular } from 'cytoscape';
+import { attackId } from './drawing.js';
 
 // The places of the arguments of an abstract framework, by their names: the drawing of a framework and its graph are
 // two ways of working on the same graph, so each places the arguments where the other has them.
@@ -52,7 +53,7 @@ export function placesAll(cy: Core, positions: Positions | null): boolean {
 export function markMutual(cy: Core): void {
     cy.batch(() =>
         cy.edges().forEach(edge => {
-            const reverse = cy.getElementById(`${edge.data('target')}->${edge.data('source')}`);
+            const reverse = cy.getElementById(attackId(edge.data('target'), edge.data('source')));
             edge.toggleClass('mutual', reverse.nonempty() && !edge.hasClass('support'));
         }),
     );

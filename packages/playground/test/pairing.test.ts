@@ -13,71 +13,32 @@ import {
     normalCode,
     seal,
     unseal,
-    type Channels,
-    type Peer,
+    type Invitation,
+    type InvitingOptions,
 } from '../src/federation/pairing.js';
-import type { Fetch } from '../src/federation/relay.js';
+import { fakeChannels, fakePage, fakePeer, fakeRelay, sleep } from './fakes.js';
 
 const { deepEqual, equal, match } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
 
 const BASE = 'https://tuprolog.github.io/arg2p-kt-web/';
 
-/** A relay as ntfy answers: what is published on a topic is read back with its id, after the one given (`since`) */
-function fakeRelay() {
-    const topics = new Map<string, { id: string; message: string }[]>();
-    const state = { down: false, published: [] as string[] };
-    let ids = 0;
-    const fetch: Fetch = async (url, init) => {
-        if (state.down) throw new TypeError('Failed to fetch');
-        const { pathname, searchParams } = new URL(url);
-        const [topic, kind] = pathname.slice(1).split('/') as [string, string | undefined];
-        const messages = topics.get(topic) ?? [];
-        topics.set(topic, messages);
-        if (init?.method === 'POST') {
-            messages.push({ id: `m${++ids}`, message: init.body! });
-            state.published.push(init.body!);
-            return { ok: true, status: 200, text: async () => '' };
-        }
-        equal(kind, 'json');
-        equal(searchParams.get('poll'), '1');
-        const since = searchParams.get('since');
-        const after = since === 'all' ? messages : messages.slice(messages.findIndex(it => it.id === since) + 1);
-        const lines = after.map(it => JSON.stringify({ id: it.id, time: 0, event: 'message', topic, message: it.message }));
-        return { ok: true, status: 200, text: async () => [JSON.stringify({ id: 'k', event: 'keepalive' }), ...lines].join('\n') };
-    };
-    return { fetch, state };
+/** The invitation the link of [inviting] carries */
+function invitationOf(inviting: Inviting): Invitation {
+    return decodeInvitation(readPairing(new URL(inviting.link).hash)!.code)!;
 }
 
-/** The WebRTC of a device: what it was asked, and its answers */
-function fakePeer(name: string) {
-    const completed: string[] = [];
-    const peer: Peer = {
-        invite: async () => `offer-of-${name}`,
-        accept: async offer => `answer-of-${name}-to-${offer}`,
-        complete: async reply => {
-            if (!reply.startsWith('answer-')) throw new Error('not an answer');
-            completed.push(reply);
-        },
-    };
-    return { peer, completed };
+/** What [promise] failed with: a failure itself when it did not fail */
+async function failure(promise: Promise<unknown>): Promise<Error> {
+    return promise.then(
+        () => assert.fail('it did not fail'),
+        (error: Error) => error,
+    );
 }
 
-/** The pages of a device, on one channel: what one posts the others are told, as a BroadcastChannel does */
-function fakeChannels(): Channels {
-    const pages = new Set<{ listeners: ((event: { data: unknown }) => void)[] }>();
-    return () => {
-        const page = { listeners: [] as ((event: { data: unknown }) => void)[] };
-        pages.add(page);
-        return {
-            addEventListener: (_: string, listener: (event: { data: unknown }) => void) => page.listeners.push(listener),
-            postMessage: (data: unknown) => {
-                if (!pages.has(page)) throw new Error('Channel is closed');
-                [...pages].filter(it => it !== page).forEach(it => it.listeners.forEach(listener => setTimeout(() => listener({ data: structuredClone(data) }))));
-            },
-            close: () => pages.delete(page),
-        } as unknown as BroadcastChannel;
-    };
+/** An invitation of [peer] through [relay], on no page and no channel unless told */
+function invite(peer: ReturnType<typeof fakePeer>, relay: ReturnType<typeof fakeRelay>, options: Partial<InvitingOptions> = {}): Promise<Inviting> {
+    return Inviting.start(peer.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels: () => null, page: null, ...options });
 }
 
 describe('The pairing', function () {
@@ -111,11 +72,18 @@ describe('The pairing', function () {
         assert.isNull(decodeReply('no-topic'));
     });
 
+    it('should take no invitation whose relay is no https address', function () {
+        const invitation = { topic: 'arg2p-abcdefgh12', key: 'a2V5LWtleS1rZXk', offer: 'zOFFER+/x==' };
+        for (const relay of ['http://ntfy.example.org', 'javascript:alert(1)', 'ntfy.example.org']) {
+            assert.isNull(decodeInvitation(encodeInvitation({ ...invitation, relay })), relay);
+        }
+    });
+
     it('should pair with the reply whose code is typed, through the relay', async function () {
         const relay = fakeRelay();
         const a = fakePeer('a');
         const b = fakePeer('b');
-        const inviting = await Inviting.start(a.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels: () => null });
+        const inviting = await invite(a, relay);
         try {
             // the QR code: the link of the invitation
             const code = readPairing(new URL(inviting.link).hash)!;
@@ -124,8 +92,8 @@ describe('The pairing', function () {
             equal(invitation.offer, 'offer-of-a');
             // another device replies on the topic too, and something that is no reply
             await relay.fetch(`${DEFAULT_RELAY}/${invitation.topic}`, { method: 'POST', body: 'spam' });
-            const other = await join(fakePeer('c').peer, invitation, BASE, relay.fetch);
-            const joined = await join(b.peer, invitation, BASE, relay.fetch);
+            const other = await join(fakePeer('c').peer, invitation, BASE, { fetch: relay.fetch });
+            const joined = await join(b.peer, invitation, BASE, { fetch: relay.fetch });
             ok(joined.code !== null && joined.relayError === null);
             // the relay sees no reply in the clear
             relay.state.published.forEach(it => assert.notInclude(it, 'answer-of'));
@@ -137,19 +105,75 @@ describe('The pairing', function () {
         }
     });
 
+    it('should refuse a code two different replies came with: someone else holds the invitation', async function () {
+        const relay = fakeRelay();
+        const a = fakePeer('a');
+        const dropped: string[] = [];
+        const inviting = await invite(a, relay, { dropped: () => dropped.push('dropped') });
+        const invitation = invitationOf(inviting);
+        const joined = await join(fakePeer('b').peer, invitation, BASE, { fetch: relay.fetch });
+        // whoever holds the link reads the reply of B (the link carries the key), and publishes their own with its code
+        const [sealed] = relay.state.published;
+        const { code } = JSON.parse(await unseal(invitation.key, sealed!)) as { code: string };
+        equal(code, joined.code);
+        await relay.fetch(`${DEFAULT_RELAY}/${invitation.topic}`, {
+            method: 'POST',
+            body: await seal(invitation.key, JSON.stringify({ code, answer: 'answer-of-mallory' })),
+        });
+        // the same reply come twice is no conflict
+        await relay.fetch(`${DEFAULT_RELAY}/${invitation.topic}`, { method: 'POST', body: sealed! });
+        await sleep(2500);
+        match((await failure(inviting.pair(code))).message, /Two different replies came with the code/);
+        deepEqual(a.completed, []);
+        // and the invitation is dropped
+        deepEqual(dropped, ['dropped']);
+        match((await failure(inviting.pair(code))).message, /dropped/);
+    });
+
+    it('should keep the first reply of a code: a later one pairs with none', async function () {
+        const relay = fakeRelay();
+        const a = fakePeer('a');
+        const inviting = await invite(a, relay);
+        const invitation = invitationOf(inviting);
+        const joined = await join(fakePeer('b').peer, invitation, BASE, { fetch: relay.fetch });
+        await sleep(2500);
+        // B's reply, read before the other one comes
+        const pairing = inviting.pair(joined.code!);
+        await relay.fetch(`${DEFAULT_RELAY}/${invitation.topic}`, {
+            method: 'POST',
+            body: await seal(invitation.key, JSON.stringify({ code: joined.code, answer: 'answer-of-mallory' })),
+        });
+        await pairing;
+        deepEqual(a.completed, ['answer-of-b-to-offer-of-a']);
+    });
+
     it('should give the reply as a link when the relay cannot take it, and pair with it', async function () {
         const relay = fakeRelay();
         const a = fakePeer('a');
-        const inviting = await Inviting.start(a.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels: () => null });
+        const inviting = await invite(a, relay);
         try {
             relay.state.down = true;
-            const joined = await join(fakePeer('b').peer, decodeInvitation(readPairing(new URL(inviting.link).hash)!.code)!, BASE, relay.fetch);
+            const joined = await join(fakePeer('b').peer, invitationOf(inviting), BASE, { fetch: relay.fetch });
             assert.isNull(joined.code);
             match(joined.relayError!, /Failed to fetch/);
             const reply = readPairing(new URL(joined.link).hash)!;
             equal(reply.kind, 'reply');
             ok(await inviting.take(decodeReply(reply.code)!));
             deepEqual(a.completed, ['answer-of-b-to-offer-of-a']);
+        } finally {
+            inviting.close();
+        }
+    });
+
+    it('should send no reply once joining is cancelled', async function () {
+        const relay = fakeRelay();
+        const inviting = await invite(fakePeer('a'), relay);
+        try {
+            const cancelled = new AbortController();
+            const joining = join(fakePeer('b').peer, invitationOf(inviting), BASE, { fetch: relay.fetch, signal: cancelled.signal });
+            cancelled.abort();
+            equal((await failure(joining)).name, 'AbortError');
+            deepEqual(relay.state.published, []);
         } finally {
             inviting.close();
         }
@@ -162,36 +186,102 @@ describe('The pairing', function () {
         const second = fakePeer('second');
         // two pages of this device invite
         const told: string[] = [];
-        const inviting = await Inviting.start(first.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels, handedOff: () => told.push('first') });
-        const another = await Inviting.start(second.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels, handedOff: () => told.push('second') });
+        const inviting = await invite(first, relay, { channels, handedOff: () => told.push('first') });
+        const another = await invite(second, relay, { channels, handedOff: () => told.push('second') });
         try {
-            const invitation = decodeInvitation(readPairing(new URL(another.link).hash)!.code)!;
             relay.state.down = true;
-            const joined = await join(fakePeer('b').peer, invitation, BASE, relay.fetch);
+            const joined = await join(fakePeer('b').peer, invitationOf(another), BASE, { fetch: relay.fetch });
             // the reply link, opened in a page of its own on this device
-            const answered = await handOff(decodeReply(readPairing(new URL(joined.link).hash)!.code)!, 2000, channels);
+            const answered = await handOff(decodeReply(readPairing(new URL(joined.link).hash)!.code)!, { wait: 2000, channels });
             deepEqual(answered, { paired: true });
             deepEqual(first.completed, []);
             deepEqual(second.completed, ['answer-of-b-to-offer-of-second']);
             deepEqual(told, ['second']);
             // a reply to no invitation of this device: no page answers
-            assert.isNull(await handOff({ topic: 'arg2p-nobodyhere', answer: 'answer-x' }, 200, channels));
+            assert.isNull(await handOff({ topic: 'arg2p-nobodyhere', answer: 'answer-x' }, { wait: 200, channels }));
         } finally {
             inviting.close();
             another.close();
         }
     });
 
-    it('should drop an invitation: no reply pairs with it any longer', async function () {
+    it('should wait for a pairing handed off as long as it takes, once the page of the invitation takes the reply', async function () {
+        const relay = fakeRelay();
+        const channels = fakeChannels();
+        // a pairing slower than the page handing off waits for a page to take its reply
+        const a = fakePeer('a', 400);
+        const inviting = await invite(a, relay, { channels });
+        const answered = await handOff({ topic: inviting.topic, answer: 'answer-of-b' }, { wait: 100, channels });
+        deepEqual(answered, { paired: true });
+        deepEqual(a.completed, ['answer-of-b']);
+    });
+
+    it('should tell the page handing off why the pairing failed', async function () {
+        const relay = fakeRelay();
+        const channels = fakeChannels();
+        const inviting = await invite(fakePeer('a'), relay, { channels });
+        deepEqual(await handOff({ topic: inviting.topic, answer: 'garbage' }, { wait: 500, channels }), { paired: false, message: 'not an answer' });
+    });
+
+    it('should drop an invitation: no reply pairs with it any longer, and a code waiting for its reply fails', async function () {
         const relay = fakeRelay();
         const a = fakePeer('a');
-        const inviting = await Inviting.start(a.peer, { relay: DEFAULT_RELAY, base: BASE, fetch: relay.fetch, channels: () => null });
-        const reply = { topic: decodeInvitation(readPairing(new URL(inviting.link).hash)!.code)!.topic, answer: 'answer-late' };
+        const inviting = await invite(a, relay);
+        const waiting = inviting.pair('ABCDE');
+        const reply = { topic: invitationOf(inviting).topic, answer: 'answer-late' };
         inviting.close();
-        await inviting.take(reply).then(
-            () => assert.fail('paired with a dropped invitation'),
-            error => match(error.message, /dropped/),
-        );
+        match((await failure(waiting)).message, /dropped/);
+        match((await failure(inviting.take(reply))).message, /dropped/);
         deepEqual(a.completed, []);
+        // nor does it read the relay
+        const reads = relay.reads();
+        await sleep(2500);
+        equal(relay.reads(), reads);
+    });
+
+    it('should wait for the last code typed alone', async function () {
+        const relay = fakeRelay();
+        const inviting = await invite(fakePeer('a'), relay);
+        try {
+            const first = inviting.pair('AAAAA');
+            const second = inviting.pair('BBBBB');
+            match((await failure(first)).message, /Another code was typed/);
+            const joined = await join(fakePeer('b').peer, invitationOf(inviting), BASE, { fetch: relay.fetch });
+            // the code of the reply typed after: the one waited for is that of the last call
+            const third = inviting.pair(joined.code!);
+            match((await failure(second)).message, /Another code was typed/);
+            await third;
+        } finally {
+            inviting.close();
+        }
+    });
+
+    it('should end once its lifetime is over, and read the relay no longer', async function () {
+        const relay = fakeRelay();
+        const dropped: string[] = [];
+        const inviting = await invite(fakePeer('a'), relay, { lifetime: 100, dropped: () => dropped.push('dropped') });
+        await sleep(200);
+        deepEqual(dropped, ['dropped']);
+        const reads = relay.reads();
+        await sleep(2500);
+        equal(relay.reads(), reads);
+        match((await failure(inviting.pair('ABCDE'))).message, /dropped/);
+    });
+
+    it('should read the relay only while its page is shown, and end with it', async function () {
+        const relay = fakeRelay();
+        const page = fakePage();
+        page.hide(true);
+        const dropped: string[] = [];
+        const inviting = await invite(fakePeer('a'), relay, { page: page.page, dropped: () => dropped.push('dropped') });
+        // the first read, made as it started
+        await sleep(2500);
+        equal(relay.reads(), 1);
+        page.hide(false);
+        await sleep(100);
+        equal(relay.reads(), 2);
+        page.leave();
+        deepEqual(dropped, ['dropped']);
+        match((await failure(inviting.pair('ABCDE'))).message, /dropped/);
     });
 });

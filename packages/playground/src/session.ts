@@ -40,15 +40,19 @@ export class Session {
         this.workspace = this.stored();
     }
 
-    /** Keeps in step with the other pages of [target] (a window), and saves before the page goes away */
-    attach(target: Window): void {
-        target.addEventListener('pagehide', () => this.flush());
-        target.document.addEventListener('visibilitychange', () => {
-            if (target.document.hidden) this.flush();
-        });
-        target.addEventListener('storage', event => {
-            if (event.key === store.KEY) this.changedElsewhere();
-        });
+    /** Keeps in step with the other pages of [target] (a window), and saves before the page goes away: gives what stops it */
+    attach(target: Window): () => void {
+        const gone = () => this.flush();
+        const hidden = () => target.document.hidden && this.flush();
+        const stored = (event: StorageEvent) => event.key === store.KEY && this.changedElsewhere();
+        target.addEventListener('pagehide', gone);
+        target.document.addEventListener('visibilitychange', hidden);
+        target.addEventListener('storage', stored);
+        return () => {
+            target.removeEventListener('pagehide', gone);
+            target.document.removeEventListener('visibilitychange', hidden);
+            target.removeEventListener('storage', stored);
+        };
     }
 
     get current(): Workspace {
@@ -177,18 +181,5 @@ export class Session {
             this.load(doc);
         }
         this.listener.changed(this.workspace, this.active);
-    }
-}
-
-/** localStorage, or a memory that lasts the visit alone when it cannot be used (private mode, storage disabled) */
-export function browserStorage(): Storage {
-    try {
-        const probe = 'arg2p.probe';
-        window.localStorage.setItem(probe, probe);
-        window.localStorage.removeItem(probe);
-        return window.localStorage;
-    } catch {
-        const items = new Map<string, string>();
-        return { getItem: key => items.get(key) ?? null, setItem: (key, value) => void items.set(key, `${value}`) };
     }
 }

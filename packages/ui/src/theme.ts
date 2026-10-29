@@ -2,7 +2,8 @@ import { css, unsafeCSS } from 'lit';
 
 // The look of the components, as custom properties a page sets (the dark theme of the playground, the theme of VS Code
 // in a webview): each falls back to the light theme. The colours of the labels (in, out, und) stay the same in every
-// theme: they carry meaning.
+// theme: they carry meaning, and white is written on them (at least 4.5:1, as WCAG AA asks), dark on the yellow of no.
+// What is written on the accent, or on the error, takes the colour of the surface, which they stand out on.
 
 // The tokens, by name (--arg2p-<name> for the page, --_<name> in the components), and their values in the light theme
 const LIGHT = {
@@ -15,8 +16,8 @@ const LIGHT = {
     accent: '#008080',
     in: '#008080',
     out: '#800000',
-    und: '#808080',
-    unlabelled: '#2b7ce9',
+    und: '#757575',
+    unlabelled: '#2671d9',
     support: '#9a9a9a',
     no: '#c9a400',
     error: '#b00020',

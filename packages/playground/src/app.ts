@@ -2,11 +2,9 @@ import '@tuprolog/arg2p-ui/editor';
 import '@tuprolog/arg2p-ui/solver';
 import type { Arg2pEditor, Arg2pSolver } from '@tuprolog/arg2p-ui';
 import {
-    DEFAULT_PROFILE,
     declaredFramework,
     frameworkOf,
     parseFramework,
-    statedProfile,
     toApx,
     toTgf,
     toTheory,
@@ -16,18 +14,20 @@ import {
 } from '@tuprolog/arg2p-ui/data';
 import { JsEngine } from '@tuprolog/arg2p-ui/js';
 import { LitElement, html, nothing } from 'lit';
-import { blank, DEFAULT_QUERY, type Content, type Workspace } from './documents.js';
+import { blank, DEFAULT_QUERY, profileOf, type Content, type Workspace } from './documents.js';
 import { EXAMPLES, type Example } from './examples.js';
 import { ClusterEngine } from './federation/engine.js';
 import { Federation, workerCount } from './federation/federation.js';
 import './federation/panel.js';
 import { downloadText, fileName, pickFile } from './files.js';
 import { loadLayout, saveLayout, type Layout } from './layout.js';
-import { read, shareUrl } from './links.js';
+import { shareUrl, type Shared } from './links.js';
 import { Menus } from './menus.js';
-import { Session, browserStorage } from './session.js';
+import { followLinks } from './router.js';
+import { Session } from './session.js';
 import type { Arg2pShare } from './share.js';
 import './share.js';
+import { browserStorage } from './storage.js';
 import { styles } from './styles.js';
 import './tabs.js';
 import { currentTheme, followSystem, toggleTheme } from './theme.js';
@@ -37,11 +37,10 @@ const PROJECT = 'https://github.com/tuProlog/arg2p-kt';
 const UNSAVED =
     'The browser did not keep the last changes (its storage is full, or disabled): they stay in this page, and are saved again at the next change. Forget closed theories, or close some, to make room.';
 
-/** What the page tells: a failure, or news, with what can be done about it */
+/** What the page tells: a failure, or news */
 interface Notice {
     readonly text: string;
     readonly error: boolean;
-    readonly action?: { readonly label: string; run(): void };
 }
 
 /**
@@ -55,6 +54,7 @@ export class Arg2pPlayground extends LitElement {
         active: { state: true },
         content: { state: true },
         notice: { state: true },
+        newVersion: { state: true },
         theme: { state: true },
         layout: { state: true },
         tab: { state: true },
@@ -91,8 +91,10 @@ export class Arg2pPlayground extends LitElement {
     private devices = 0;
     // the graph of the solution shown, for its framework to be exported
     private graph: GraphData | null = null;
-    // a new version of the playground, waiting to be loaded
-    private pending: (() => void) | null = null;
+    // a new version of the playground, waiting to be loaded: what loads it, and whether loading it now was warned of
+    private newVersion: { readonly apply: () => void; readonly warned: boolean } | null = null;
+    // what stops following the page, its links, its theme and the federation, once the playground leaves it
+    private stops: (() => void)[] = [];
 
     constructor() {
         super();
@@ -101,26 +103,32 @@ export class Arg2pPlayground extends LitElement {
 
     override connectedCallback(): void {
         super.connectedCallback();
-        followSystem();
-        document.addEventListener('arg2p-theme', () => {
+        const themed = () => {
             this.theme = currentTheme();
             this.solver?.restyle();
-        });
-        this.federation.subscribe(() => (this.devices = this.federation.devices.length));
-        this.session.attach(window);
+        };
+        document.addEventListener('arg2p-theme', themed);
+        this.stops = [
+            () => document.removeEventListener('arg2p-theme', themed),
+            followSystem(),
+            this.federation.subscribe(() => (this.devices = this.federation.devices.length)),
+            this.session.attach(window),
+        ];
         this.session.restore(() => EXAMPLES[0]!, EXAMPLES[0]!.name);
-        // A shared link opens in a tab of its own, so that it never overwrites anything, and runs; it leaves the
-        // address bar, so that a reload does not open it again
-        const link = read(window.location.search);
-        if (link.errors.length > 0) this.notice = { text: link.errors.join(' '), error: true };
-        if (link.content !== null) {
-            this.session.open({ ...blank(), ...link.content }, 'Shared link');
-            window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-            this.updateComplete.then(() => this.solver?.run());
-        } else {
-            // the first evaluation is much slower than the next ones: the solver warms up meanwhile
-            whenIdle(() => this.local.start());
-        }
+        this.stops.push(
+            followLinks(window, {
+                shared: link => this.openShared(link),
+                pairing: link => void this.updateComplete.then(() => this.renderRoot.querySelector('arg2p-federation')?.open(link)),
+            }),
+        );
+        // the first evaluation is much slower than the next ones: the solver warms up meanwhile
+        whenIdle(() => this.local.start());
+    }
+
+    override disconnectedCallback(): void {
+        super.disconnectedCallback();
+        this.stops.forEach(stop => stop());
+        this.stops = [];
     }
 
     /**
@@ -128,20 +136,22 @@ export class Arg2pPlayground extends LitElement {
      * federation goes on, and the user agrees
      */
     offerUpdate(apply: () => void): void {
-        this.pending = apply;
-        this.notice = { text: 'A new version of the playground is ready.', error: false, action: { label: 'Reload', run: () => this.reload() } };
+        this.newVersion = { apply, warned: false };
     }
 
     private reload(): void {
-        if (this.busy || this.federation.running) {
-            this.notice = {
-                text: 'A run or a federation is going on, and reloading would end it: reload once it is over (or leave the federation).',
-                error: false,
-                action: { label: 'Reload anyway', run: () => this.pending?.() },
-            };
-            return;
-        }
-        this.pending?.();
+        const update = this.newVersion;
+        if (update === null) return;
+        if (!update.warned && (this.busy || this.federation.running)) this.newVersion = { ...update, warned: true };
+        else update.apply();
+    }
+
+    // A shared link opens in a tab of its own, so that it never overwrites anything, and runs
+    private openShared(link: Shared): void {
+        if (link.errors.length > 0) this.notice = { text: link.errors.join(' '), error: true };
+        if (link.content === null) return;
+        this.session.open({ ...blank(), ...link.content }, 'Shared link');
+        void this.updateComplete.then(() => this.solver?.run());
     }
 
     private get solver(): Arg2pSolver | null {
@@ -167,7 +177,7 @@ export class Arg2pPlayground extends LitElement {
     }
 
     private get abstract(): boolean {
-        return (statedProfile(this.content.theory) ?? statedProfile(this.content.flags) ?? DEFAULT_PROFILE) === 'abstract';
+        return profileOf(this.content) === 'abstract';
     }
 
     private get name(): string {
@@ -267,10 +277,25 @@ export class Arg2pPlayground extends LitElement {
                 ? nothing
                 : html`<div class="notice ${notice.error ? 'error' : ''}" role="status">
                       <span>${notice.text}</span>
-                      ${notice.action === undefined ? nothing : html`<button type="button" @click=${() => notice.action!.run()}>${notice.action.label}</button>`}
                       <button type="button" class="link" @click=${() => (this.notice = null)}>Dismiss</button>
                   </div>`}
+            ${this.renderNewVersion()}
         `;
+    }
+
+    // A new version, offered apart from the notices: none of them hides it
+    private renderNewVersion() {
+        const update = this.newVersion;
+        if (update === null) return nothing;
+        return html`<div class="notice" role="status">
+            <span>
+                ${update.warned
+                    ? 'A run or a federation is going on, and reloading would end it: reload once it is over (or leave the federation).'
+                    : 'A new version of the playground is ready.'}
+            </span>
+            <button type="button" @click=${() => this.reload()}>${update.warned ? 'Reload anyway' : 'Reload'}</button>
+            <button type="button" class="link" @click=${() => (this.newVersion = null)}>Later</button>
+        </div>`;
     }
 
     private renderTheory() {

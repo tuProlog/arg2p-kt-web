@@ -1,4 +1,5 @@
 import { LitElement, css } from 'lit';
+import { keepSetting, setting } from './storage.js';
 
 // The layout of the playground as the user resizes it: the widths of its columns, kept by the browser, and the
 // dividers that resize them
@@ -17,21 +18,17 @@ const MAX = 80;
 export function loadLayout(): Layout {
     const layout = { theory: 40, solutions: 30 };
     try {
-        const stored = JSON.parse(localStorage.getItem(SETTING) ?? '{}') as Partial<Layout>;
+        const stored = JSON.parse(setting(SETTING) ?? '{}') as Partial<Layout>;
         if (typeof stored.theory === 'number') layout.theory = stored.theory;
         if (typeof stored.solutions === 'number') layout.solutions = stored.solutions;
     } catch {
-        // the default layout
+        // unreadable: the default layout
     }
     return layout;
 }
 
 export function saveLayout(layout: Layout): void {
-    try {
-        localStorage.setItem(SETTING, JSON.stringify(layout));
-    } catch {
-        // not remembered: it applies all the same
-    }
+    keepSetting(SETTING, JSON.stringify(layout));
 }
 
 /**

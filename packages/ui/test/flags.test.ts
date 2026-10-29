@@ -3,7 +3,7 @@ import { afterEach, assert, describe, it } from 'vitest';
 import '../src/index.js';
 import type { Arg2pFlags } from '../src/components/arg2p-flags.js';
 import { DEFAULT_FLAGS, DEFAULTS, type Settings } from '../src/flags/schema.js';
-import { statedFlags, statedProfile, withNone, withSwitch, withValues, without } from '../src/flags/text.js';
+import { profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without } from '../src/flags/text.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
@@ -31,6 +31,14 @@ describe('Flags as text', function () {
         equal(stated.has('metaRules'), false);
         equal(statedProfile(FULL), 'aspic_plus');
         equal(statedProfile('queryMode.'), null);
+    });
+
+    it('should tell the profile in effect: as the engine has it, or as the theory, the flags or the default state it', function () {
+        equal(profileOf('graphBuildMode(aba).', 'graphBuildMode(abstract).'), 'aba');
+        equal(profileOf('a.', 'graphBuildMode(abstract).'), 'abstract');
+        equal(profileOf('a.', 'queryMode.'), 'aspic_plus');
+        equal(profileOf('graphBuildMode(aba).', '', { graphBuildMode: ['abstract'] }), 'abstract');
+        equal(profileOf('graphBuildMode(aba).', '', {}), 'aba');
     });
 
     it('should tolerate spaces and comments, and read a set stated empty', function () {

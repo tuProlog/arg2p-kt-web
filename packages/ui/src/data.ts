@@ -1,11 +1,8 @@
 // What the components are built on, with no component: the contract of the engines, the flags and the profiles, the
-// formats of abstract frameworks, the layout of graphs. It needs no DOM (@tuprolog/arg2p-ui/data).
+// formats of abstract frameworks. It needs no DOM (@tuprolog/arg2p-ui/data).
 export * from './engine.js';
-export { layeredLayout, type Link, type Point, type Size, type LayoutOptions } from './graph/layout.js';
-export { levelsOf, supportsOf } from './graph/levels.js';
-export { isAbstract, nameOf } from './graph/drawing.js';
 export { parseFramework, toApx, toTgf, toTheory, frameworkOf, type Framework, type ReadFramework } from './formats/frameworks.js';
-export { declaredFramework, redrawn } from './formats/declarations.js';
+export { declaredFramework } from './formats/declarations.js';
 export {
     FLAG_GROUPS,
     FLAGS,
@@ -21,5 +18,12 @@ export {
     type ProfileInfo,
     type Settings,
 } from './flags/schema.js';
-export { statedFlags, statedProfile, withValues, withNone, withSwitch, without } from './flags/text.js';
+export { statedFlags, statedProfile, profileOf, withValues, withNone, withSwitch, without } from './flags/text.js';
 export type { Positions } from './graph/positions.js';
+
+// How the graph and the drawing draw (the layout of the rows of a graph, the names of its arguments, a theory rewritten
+// by drawing): kept for the pages that took them, they are internal, no part of the API, and may change in any version
+export { layeredLayout, type Link, type Point, type Size, type LayoutOptions } from './graph/layout.js';
+export { levelsOf, supportsOf } from './graph/levels.js';
+export { isAbstract, nameOf } from './graph/drawing.js';
+export { redrawn } from './formats/declarations.js';

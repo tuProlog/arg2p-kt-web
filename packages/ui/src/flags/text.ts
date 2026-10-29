@@ -1,5 +1,5 @@
 import { quote, unquote } from '../formats/atoms.js';
-import { FLAGS, type Flag } from './schema.js';
+import { DEFAULT_PROFILE, FLAGS, type Flag, type Settings } from './schema.js';
 
 // The flags as a text of Prolog facts, `name(value).` or a plain `name.` switch: the text stays the source of truth,
 // and a change touches the lines of its flag alone (the others, and comments, stay as they are).
@@ -50,6 +50,14 @@ export function statedFlags(text: string, flags: readonly Flag[] = FLAGS): State
 /** The profile [text] states (graphBuildMode), if any */
 export function statedProfile(text: string): string | null {
     return valuesOf(text, 'graphBuildMode')[0] ?? null;
+}
+
+/**
+ * The profile [theory] is read in, solved with [flags]: the one in effect, as [settings] (those an engine tells) have
+ * it, or else the one the theory states, or the flags, or the default
+ */
+export function profileOf(theory: string, flags: string, settings: Settings | null = null): string {
+    return settings?.graphBuildMode?.[0] ?? statedProfile(theory) ?? statedProfile(flags) ?? DEFAULT_PROFILE;
 }
 
 // Every line matching [pattern] replaced by [replacement] (some lines, or none), where the first of them was, or at

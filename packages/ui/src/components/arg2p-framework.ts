@@ -1,15 +1,17 @@
 import type { Core, EventObject, StylesheetJson } from 'cytoscape';
-import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
+import { css, html, nothing, type PropertyValues } from 'lit';
 import type { GraphData } from '../engine.js';
+import { emit } from '../events.js';
 import { isAtom } from '../formats/atoms.js';
 import { declaredFramework, redrawn } from '../formats/declarations.js';
 import { frameworkOf, type Framework } from '../formats/frameworks.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
-import { isAbstract, nameOf } from '../graph/drawing.js';
+import { attackId, isAbstract, nameOf } from '../graph/drawing.js';
 import type { Positions } from '../graph/positions.js';
 import { tokens } from '../theme.js';
+import { CanvasElement, canvasStyles } from './canvas-element.js';
 import { popup, popupStyles, type AttackShown } from './popup.js';
-import { buttons, chips, define, emit } from './shared.js';
+import { buttons, chips, define } from './shared.js';
 
 type Mode = 'select' | 'argument' | 'attack';
 
@@ -44,7 +46,7 @@ const STYLE: StylesheetJson = [
  * Events: `arg2p-theory-change` with the theory, after every change made by drawing; `arg2p-positions` with where the
  * arguments are, as they are laid out or dragged; `arg2p-export` with the picture of the framework, as for the graph.
  */
-export class Arg2pFramework extends LitElement {
+export class Arg2pFramework extends CanvasElement {
     static override properties = {
         theory: {},
         graph: { attribute: false },
@@ -81,7 +83,7 @@ export class Arg2pFramework extends LitElement {
     private drawnAttacks: readonly Shown<{ from: string; to: string }>[] = [];
     private labels: ReadonlyMap<string, string> = new Map();
 
-    private readonly canvas = new Canvas(this, {
+    protected readonly canvas = new Canvas(this, {
         style: STYLE,
         redraw: () => this.draw(),
         setup: cy => this.listen(cy),
@@ -90,19 +92,8 @@ export class Arg2pFramework extends LitElement {
         locked: () => this.readonly,
     });
 
-    /** Fits the drawing to the element (after it was hidden, and so sized to nothing) */
-    fit(): void {
-        this.canvas.fit();
-    }
-
-    /** The framework as a PNG picture, as a data URL */
-    png(): string {
-        return this.canvas.png();
-    }
-
-    /** Draws the framework again, in the colours the page sets now (after a change of theme) */
-    restyle(): void {
-        this.canvas.restyle();
+    protected get blank(): boolean {
+        return this.drawnArguments.length === 0;
     }
 
     protected override willUpdate(changed: PropertyValues): void {
@@ -127,14 +118,14 @@ export class Arg2pFramework extends LitElement {
     private read(): void {
         this.declared = declaredFramework(this.theory);
         const solved = this.labelled === null ? { arguments: [], attacks: [] } : frameworkOf(this.labelled);
-        const declaredAttacks = new Set(this.declared.attacks.map(key));
+        const declaredAttacks = new Set(this.declared.attacks.map(it => attackId(it.from, it.to)));
         this.drawnArguments = [
             ...this.declared.arguments.map(it => ({ it, derived: false })),
             ...solved.arguments.filter(it => !this.declared.arguments.includes(it)).map(it => ({ it, derived: true })),
         ];
         this.drawnAttacks = [
             ...this.declared.attacks.map(it => ({ it, derived: false })),
-            ...solved.attacks.filter(it => !declaredAttacks.has(key(it))).map(it => ({ it, derived: true })),
+            ...solved.attacks.filter(it => !declaredAttacks.has(attackId(it.from, it.to))).map(it => ({ it, derived: true })),
         ];
         this.labels = new Map((this.labelled?.arguments ?? []).map(it => [nameOf(it, true), it.label]));
         if (this.source !== null && !this.drawnArguments.some(({ it }) => it === this.source)) this.source = null;
@@ -151,7 +142,7 @@ export class Arg2pFramework extends LitElement {
         }));
         const edges: Drawn[] = this.drawnAttacks.map(({ it, derived }) => ({
             group: 'edges',
-            data: { id: key(it), source: it.from, target: it.to, tone: tone(it.from) },
+            data: { id: attackId(it.from, it.to), source: it.from, target: it.to, tone: tone(it.from) },
             classes: derived ? 'derived' : '',
         }));
         this.canvas.draw([...nodes, ...edges]);
@@ -216,7 +207,7 @@ export class Arg2pFramework extends LitElement {
         const goneAttacks = new Set(cy.$('edge:selected').map(it => it.id()));
         this.change({
             arguments: this.declared.arguments.filter(it => !gone.has(it)),
-            attacks: this.declared.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(key(it))),
+            attacks: this.declared.attacks.filter(it => !gone.has(it.from) && !gone.has(it.to) && !goneAttacks.has(attackId(it.from, it.to))),
         });
         this.selected = cy.$(':selected').nonempty();
     }
@@ -299,9 +290,15 @@ export class Arg2pFramework extends LitElement {
                           <button type="button" title="Delete what is selected (Del)" ?disabled=${!this.selected} @click=${() => this.deleteSelected()}>Delete</button>
                           <span class="hint">${hint}</span>
                       `}
-                <button type="button" class="png" title="Download the framework as a picture" @click=${() => this.canvas.export(this.fileName)}>PNG</button>
+                ${this.renderPng('framework')}
             </div>
-            <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
+            <div
+                class="area"
+                tabindex="0"
+                role="group"
+                aria-label=${this.readonly ? 'The framework drawn' : 'The framework drawn: Delete removes what is selected, Escape goes back to selecting'}
+                @keydown=${(e: KeyboardEvent) => this.onKey(e)}
+            >
                 <div class="canvas"></div>
                 ${this.renderPopup()}
                 ${this.drawnArguments.some(it => it.derived) || this.drawnAttacks.some(it => it.derived)
@@ -355,21 +352,10 @@ export class Arg2pFramework extends LitElement {
         buttons,
         chips,
         popupStyles,
+        canvasStyles,
         css`
-            :host {
-                display: flex;
-                flex-direction: column;
-                min-height: 200px;
-                background: var(--_surface);
-                font-size: 13px;
-            }
             .bar {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
                 gap: 6px;
-                padding: 6px 10px;
-                border-bottom: 1px solid var(--_border);
             }
             button.active {
                 border-color: var(--_accent);
@@ -385,16 +371,11 @@ export class Arg2pFramework extends LitElement {
             .hint + .png {
                 margin-left: 0;
             }
-            .area {
-                flex: 1;
-                min-height: 0;
-                position: relative;
-                overflow: hidden;
+            .area:focus {
                 outline: none;
             }
-            .canvas {
-                position: absolute;
-                inset: 0;
+            .area:focus-visible {
+                box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--_accent) 45%, transparent);
             }
             .legend {
                 position: absolute;
@@ -442,10 +423,6 @@ export class Arg2pFramework extends LitElement {
             }
         `,
     ];
-}
-
-function key(attack: { from: string; to: string }): string {
-    return `${attack.from}->${attack.to}`;
 }
 
 define('arg2p-framework', Arg2pFramework);

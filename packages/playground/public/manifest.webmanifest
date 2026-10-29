@@ -1,7 +1,7 @@
 {
-  "name": "Arg2p Playground",
-  "short_name": "Arg2p",
-  "description": "Write structured argumentation theories or draw abstract frameworks, and compute their labellings with Arg2p.",
+  "name": "Arg2P Playground",
+  "short_name": "Arg2P",
+  "description": "Write argumentation theories (ASPIC+, ABA, abstract frameworks, drawn or written), and compute their labellings with Arg2P, in the browser, on this device and the devices paired with it.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
