@@ -25,7 +25,7 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
     const solver = document.querySelector('arg2p-solver');
     solver.engine = new JsEngine();
     solver.theory = 'f1 :=> bird(tweety).\nr1 : bird(X) => flies(X).\nf2 :=> -flies(tweety).';
-    solver.query = 'buildLabelSets(In, Out, Und)';
+    solver.query = 'arg2p::solve(In, Out, Und)';
     solver.flags = 'argumentLabellingMode(grounded).\nqueryMode.';
     solver.addEventListener('arg2p-theory-change', e => console.log('theory', e.detail.theory));
     solver.run();

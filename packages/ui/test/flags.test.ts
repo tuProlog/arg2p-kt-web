@@ -2,8 +2,8 @@
 import { afterEach, assert, describe, it } from 'vitest';
 import '../src/index.js';
 import type { Arg2pFlags } from '../src/components/arg2p-flags.js';
-import { DEFAULT_FLAGS, DEFAULTS, type Settings } from '../src/flags/schema.js';
-import { profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without } from '../src/flags/text.js';
+import { CONFLICT_PARTS, DEFAULT_FLAGS, DEFAULTS, FLAGS, type Settings } from '../src/flags/schema.js';
+import { expanded, profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without } from '../src/flags/text.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
@@ -61,6 +61,18 @@ describe('Flags as text', function () {
         equal(text.split('\n')[5], 'graphExtension(standardPref).');
         equal(text.split('\n')[6], 'graphExtension(rebutRestriction).');
         deepEqual(statedFlags(withNone(text, 'graphExtension')).get('graphExtension'), []);
+    });
+
+    it('should read the conflict model as its parts, builtin as all of them', function () {
+        deepEqual(statedFlags('conflictModel(builtin).').get('conflictModel'), CONFLICT_PARTS);
+        deepEqual(statedFlags('conflictModel(declared).').get('conflictModel'), ['declared']);
+        deepEqual(statedFlags('conflictModel(none).').get('conflictModel'), []);
+        deepEqual(statedFlags('conflictModel(negation).\nconflictModel(declared).').get('conflictModel'), ['negation', 'declared']);
+        // each part once, in the order stated
+        deepEqual(statedFlags('conflictModel(declared).\nconflictModel(builtin).').get('conflictModel'), ['declared', 'negation', 'deontic', 'preference']);
+        deepEqual(expanded('conflictModel', ['builtin']), CONFLICT_PARTS);
+        // a flag with no aliases keeps its values
+        deepEqual(expanded('graphExtension', ['builtin']), ['builtin']);
     });
 
     it('should turn switches on and off, and forget a flag', function () {
@@ -174,6 +186,56 @@ describe('<arg2p-flags>', function () {
         // and asks what is in effect, once
         await new Promise(resolve => setTimeout(resolve, 300));
         equal(answering.asked.at(-1)!.flags, changes.at(-1));
+    });
+
+    it('should show the conflict model as a checklist of its parts', async function () {
+        const conflicts = FLAGS.find(it => it.name === 'conflictModel')!;
+        equal(conflicts.kind, 'set');
+        deepEqual(conflicts.options!.map(it => it.value), ['negation', 'deontic', 'preference', 'declared']);
+        // all of them by default, and with an engine telling builtin (as the solvers before the parts do)
+        deepEqual(shownFlag((await panel(DEFAULT_FLAGS, '', () => DEFAULTS)).root, 'conflictModel'), { values: CONFLICT_PARTS, source: 'default' });
+        document.body.replaceChildren();
+        deepEqual(shownFlag((await panel(DEFAULT_FLAGS, '', () => ({ ...DEFAULTS, conflictModel: ['builtin'] }))).root, 'conflictModel'), {
+            values: CONFLICT_PARTS,
+            source: 'default',
+        });
+    });
+
+    it('should read the conflict model of old texts, builtin as all its parts, declared alone', async function () {
+        // no engine: what the texts state
+        const shown = async (flags: string, theory: string) => {
+            const element = document.createElement('arg2p-flags') as Arg2pFlags;
+            element.flags = flags;
+            element.theory = theory;
+            document.body.appendChild(element);
+            await element.updateComplete;
+            return shownFlag(element.shadowRoot!, 'conflictModel');
+        };
+        deepEqual(await shown(`${DEFAULT_FLAGS}conflictModel(builtin).\n`, ''), { values: CONFLICT_PARTS, source: 'flags' });
+        deepEqual(await shown(`${DEFAULT_FLAGS}conflictModel(declared).\n`, ''), { values: ['declared'], source: 'flags' });
+        deepEqual(await shown(DEFAULT_FLAGS, 'conflictModel(builtin).\na :=> b.'), { values: CONFLICT_PARTS, source: 'theory' });
+        deepEqual(await shown(DEFAULT_FLAGS, 'conflictModel(declared).\na :=> b.'), { values: ['declared'], source: 'theory' });
+    });
+
+    it('should write the parts of the conflict model ticked, never builtin', async function () {
+        const { root, changes } = await panel(`${DEFAULT_FLAGS}conflictModel(builtin).\n`, '', () => DEFAULTS);
+        const box = (part: string) => root.querySelector<HTMLInputElement>(`[data-flag=conflictModel] input[value=${part}]`)!;
+        const untick = (part: string) => {
+            box(part).checked = false;
+            box(part).dispatchEvent(new Event('change'));
+        };
+        untick('deontic');
+        const written = changes.at(-1)!;
+        ok(!written.includes('builtin'), written);
+        deepEqual(statedFlags(written).get('conflictModel'), ['negation', 'preference', 'declared']);
+        equal(written, `${DEFAULT_FLAGS}conflictModel(negation).\nconflictModel(preference).\nconflictModel(declared).\n`);
+        // none ticked: stated with none, the conflicts of the languages alone
+        const none = await panel(`${DEFAULT_FLAGS}conflictModel(declared).\n`, '', () => ({ ...DEFAULTS, conflictModel: ['declared'] }));
+        const declared = none.root.querySelector<HTMLInputElement>('[data-flag=conflictModel] input[value=declared]')!;
+        declared.checked = false;
+        declared.dispatchEvent(new Event('change'));
+        equal(none.changes.at(-1), `${DEFAULT_FLAGS}conflictModel(none).\n`);
+        deepEqual(statedFlags(none.changes.at(-1)!).get('conflictModel'), []);
     });
 
     it('should reset a flag to the value of the profile', async function () {

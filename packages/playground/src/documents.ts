@@ -23,7 +23,7 @@ export const MAX_CLOSED = 30;
 const UNTITLED = 'Untitled';
 
 /** The query a new document starts with: the labelling of the statements */
-export const DEFAULT_QUERY = 'buildLabelSets(In, Out, Und)';
+export const DEFAULT_QUERY = 'arg2p::solve(In, Out, Und)';
 
 export interface Content {
     readonly theory: string;

@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import type { Engine } from '../engine.js';
 import { emit } from '../events.js';
 import { DEFAULTS, FLAG_GROUPS, FLAGS, PROFILES, profileInfo, type Flag, type FlagGroup, type Settings } from '../flags/schema.js';
-import { profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
+import { expanded, profileOf, statedFlags, statedProfile, withNone, withSwitch, withValues, without, type Stated } from '../flags/text.js';
 import { tokens } from '../theme.js';
 import { define } from './shared.js';
 
@@ -85,7 +85,8 @@ export class Arg2pFlags extends LitElement {
         const fromTheory = this.stated.theory.get(flag.name);
         const fromFlags = this.stated.flags.get(flag.name);
         const fallback = DEFAULTS[flag.name] ?? [];
-        const values = this.settings?.[flag.name] ?? fromTheory ?? fromFlags ?? fallback;
+        // an engine telling a value that stands for several (the builtin of an older solver) tells those
+        const values = expanded(flag.name, this.settings?.[flag.name] ?? fromTheory ?? fromFlags ?? fallback);
         const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && [...a].sort().every((it, i) => it === [...b].sort()[i]);
         const source: Source =
             fromTheory !== undefined ? 'theory'

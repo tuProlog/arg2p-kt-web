@@ -159,7 +159,13 @@ describe('Settings in effect', function () {
         deepEqual(options('orderingComparator'), values(api.OrderingComparator));
         deepEqual(options('graphLanguage'), values(api.GraphLanguage));
         deepEqual(options('graphBuilder'), values(api.GraphBuilder));
-        deepEqual(options('conflictModel'), values(api.ConflictModel));
+        // the parts of the conflict model, and builtin, which stands for all of them: every value of the API is one of
+        // them, and the parts are all of them once the API has them (arg2p after 0.22.0, which has builtin and
+        // declared alone)
+        const conflicts = SCHEMA.find(it => it.name === 'conflictModel')!;
+        const known = [...options('conflictModel'), ...Object.keys(conflicts.aliases ?? {})].sort();
+        ok(values(api.ConflictModel).every(it => known.includes(it)), values(api.ConflictModel).join());
+        if (values(api.ConflictModel).includes('negation')) deepEqual(known, values(api.ConflictModel));
     });
 });
 
