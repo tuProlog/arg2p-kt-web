@@ -194,6 +194,17 @@ describe('<arg2p-graph>', function () {
         ok(graph.shadowRoot!.querySelector('.popup')!.textContent!.includes('flies(tweety)'));
     });
 
+    it('should draw nothing while out of a page, and what it was given once put back', async function () {
+        const graph = await element<Arg2pGraph>('arg2p-graph');
+        graph.remove();
+        graph.solution = shown(GRAPH);
+        await graph.updateComplete;
+        equal(drawingOf(graph), null);
+        document.body.appendChild(graph);
+        await graph.updateComplete;
+        deepEqual(drawingOf(graph)!.nodes().map(it => it.id()).sort(), ['A0', 'A1', 'A2']);
+    });
+
     it('should colour the arguments by their labels, in the colours the page sets once restyled', async function () {
         const graph = await element<Arg2pGraph>('arg2p-graph');
         graph.solution = shown(GRAPH);

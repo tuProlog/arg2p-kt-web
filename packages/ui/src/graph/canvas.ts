@@ -197,6 +197,8 @@ export class Canvas implements ReactiveController {
     }
 
     hostUpdated(): void {
+        // updated out of a page: drawn once put back in one (a drawing made now would never be ended)
+        if (!this.host.isConnected) return;
         if (this.core === null) this.create();
         this.core!.autoungrabify(this.options.locked?.() ?? false);
         this.placePopup();

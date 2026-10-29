@@ -201,6 +201,51 @@ describe('<arg2p-solver>', function () {
         equal(element.shadowRoot!.querySelector('.notice'), null);
     });
 
+    it('should let go a run replaced while it starts: stopped once, what it answers late dropped', async function () {
+        const engine = new Fake([yes()], null, true);
+        // a stop that fails nothing: the run replaced answers late
+        engine.stop = () => void engine.stops++;
+        const { element, events, find } = await solver(engine);
+        const first = element.run();
+        await settled();
+        const second = element.run();
+        await settled();
+        equal(engine.stops, 1);
+        // the starts, then the first solution of the run that replaced the other
+        engine.go();
+        await settled();
+        engine.go();
+        await Promise.all([first, second]);
+        await settled();
+        await element.updateComplete;
+        equal(engine.requests.length, 2);
+        equal(events.filter(it => it.type === 'arg2p-run').length, 2);
+        const cards = find<HTMLElement>('arg2p-solutions').shadowRoot!.querySelectorAll('.solution');
+        equal(cards.length, 1);
+        ok(cards[0].textContent!.includes('Solution 1'));
+        equal(events.some(it => it.type === 'arg2p-error'), false);
+        equal(element.busy, false);
+        equal(engine.stops, 1);
+    });
+
+    it('should stop a run under way once taken out of the page', async function () {
+        const engine = new Fake([yes()], null, true);
+        const { element } = await solver(engine);
+        const running = element.run();
+        await settled();
+        ok(element.busy);
+        element.remove();
+        equal(engine.stops, 1);
+        equal(element.busy, false);
+        await running;
+        // one done is left as it is
+        const done = new Fake([yes()]);
+        const again = await solver(done);
+        await again.element.run();
+        again.element.remove();
+        equal(done.stops, 0);
+    });
+
     it('should leave the engine be when it is cleared with nothing running', async function () {
         const engine = new Fake([yes()]);
         const { element } = await solver(engine);

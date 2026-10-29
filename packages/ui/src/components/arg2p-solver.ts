@@ -182,9 +182,11 @@ export class Arg2pSolver extends LitElement {
         this.observer.observe(this, { childList: true, subtree: true, attributes: true, attributeFilter: ['slot', 'id', 'label'] });
     }
 
+    // Taken out of the page: a run under way is stopped, and let go
     override disconnectedCallback(): void {
         super.disconnectedCallback();
         this.observer.disconnect();
+        if (this.busy) this.reset();
     }
 
     // The tab shown: the one asked for, if there is one, or else the solutions
