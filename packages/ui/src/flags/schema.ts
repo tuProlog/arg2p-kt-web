@@ -11,7 +11,9 @@ export interface FlagOption {
 
 /**
  * A flag: `choice` has one value, `set` several (the fact may appear several times), `switch` is on or off (the fact
- * is there or not), `text` has a free value. A [required] flag needs a value for the solver to run.
+ * is there or not), `text` has a free value. A [required] flag needs a value for the solver to run. The [aliases] of a
+ * set are values standing for several of its options (the `builtin` of conflictModel, all its parts): a text stating
+ * one is read as stating those, and the panel writes the options alone.
  */
 export interface Flag {
     readonly name: string;
@@ -19,6 +21,7 @@ export interface Flag {
     readonly label: string;
     readonly help: string;
     readonly options?: readonly FlagOption[];
+    readonly aliases?: Readonly<Record<string, readonly string[]>>;
     readonly required?: boolean;
     readonly placeholder?: string;
 }
@@ -41,6 +44,9 @@ export interface ProfileInfo {
 export type Settings = Readonly<Record<string, readonly string[]>>;
 
 const option = (value: string, label: string, help: string): FlagOption => ({ value, label, help });
+
+/** The parts of the conflict model (conflictModel), all of them by default: `builtin` stands for them all */
+export const CONFLICT_PARTS: readonly string[] = ['negation', 'deontic', 'preference', 'declared'];
 
 export const SEMANTICS: readonly FlagOption[] = [
     option('grounded', 'Grounded', 'The least complete labelling: what is beyond doubt.'),
@@ -179,13 +185,16 @@ export const FLAG_GROUPS: readonly FlagGroup[] = [
             },
             {
                 name: 'conflictModel',
-                kind: 'choice',
+                kind: 'set',
                 label: 'Conflicts',
                 options: [
-                    option('builtin', 'Built in', 'A literal and its negation, obligations and permissions, and the conflicts declared.'),
-                    option('declared', 'Declared', 'The conflicts the theory declares alone, as the contraries of ABA.'),
+                    option('negation', 'Negation', 'A literal and its negation: a and -a.'),
+                    option('deontic', 'Deontic', 'Obligations and permissions: o(a) and o(-a), p(a) and o(-a), o(a) and p(-a), o(a) and -p(a).'),
+                    option('preference', 'Preference', 'A superiority and its converse: sup(r1, r2) and sup(r2, r1).'),
+                    option('declared', 'Declared', 'The conflicts the theory declares, conflict/2 and conflict/3 (alone, as the contraries of ABA).'),
                 ],
-                help: 'The conflicts beyond those the theory declares.',
+                aliases: { builtin: CONFLICT_PARTS },
+                help: 'The conflicts beyond those of the languages of the theory, as the contraries of ABA, which always hold. None ticked: those alone.',
             },
         ],
     },
@@ -228,7 +237,7 @@ export const DEFAULTS: Settings = {
     modulesPath: [],
     graphBuilder: ['ruleGraph'],
     graphLanguage: [],
-    conflictModel: ['builtin'],
+    conflictModel: CONFLICT_PARTS,
 };
 
 /**

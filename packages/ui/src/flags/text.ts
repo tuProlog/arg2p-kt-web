@@ -30,8 +30,18 @@ function valuesOf(text: string, name: string): string[] {
 }
 
 /**
+ * The values of the flag [name] with those standing for several of its options (its aliases, as the `builtin` of
+ * conflictModel) replaced by these, each once, in the order they come
+ */
+export function expanded(name: string, values: readonly string[], flags: readonly Flag[] = FLAGS): readonly string[] {
+    const aliases = flags.find(it => it.name === name)?.aliases;
+    if (aliases === undefined) return values;
+    return [...new Set(values.flatMap(it => aliases[it] ?? [it]))];
+}
+
+/**
  * The flags [text] states, of [flags]: a switch stated on has the value `true` (`name.`), off none (`name(off).`); a
- * flag stated with no value (`name(none).`) has none
+ * flag stated with no value (`name(none).`) has none; a value standing for several (an alias) states those
  */
 export function statedFlags(text: string, flags: readonly Flag[] = FLAGS): Stated {
     const stated = new Map<string, readonly string[]>();
@@ -41,7 +51,7 @@ export function statedFlags(text: string, flags: readonly Flag[] = FLAGS): State
             if (text.split('\n').some(line => switchLine(flag.name).test(line))) stated.set(flag.name, ['true']);
             else if (values.length > 0) stated.set(flag.name, values.includes('off') ? [] : ['true']);
         } else if (values.length > 0) {
-            stated.set(flag.name, values.filter(it => it !== 'none'));
+            stated.set(flag.name, expanded(flag.name, values.filter(it => it !== 'none'), flags));
         }
     });
     return stated;
