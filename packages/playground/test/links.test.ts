@@ -1,13 +1,12 @@
 import { deflateSync, strToU8 } from 'fflate';
 import { assert, describe, it } from 'vitest';
+import { toBase64url as base64url } from '../src/base64url.js';
 import { read, shareUrl } from '../src/links.js';
 
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
 
 const BASE = 'https://tuprolog.github.io/arg2p-kt-web/?stale=1#here';
-
-const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 describe('Links', function () {
     it('should share nothing without parameters', function () {

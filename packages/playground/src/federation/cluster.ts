@@ -1,44 +1,12 @@
-import { Flags, WebWorkerCluster, type Graph, type Solution } from '@tuprolog/arg2p';
+import { Flags, WebWorkerCluster, type Solution } from '@tuprolog/arg2p';
 import type { GraphData, SolutionData, SolveRequest } from '@tuprolog/arg2p-ui/data';
 import { graphData } from '@tuprolog/arg2p-ui/js';
+import { profileOf } from '../documents.js';
 import { workerCount, type Cluster, type FederationStats, type ParallelRun } from './federation.js';
 import workerUrl from './worker.ts?worker&url';
 
 // The cluster of the playground: a WebWorkerCluster of @tuprolog/arg2p on Web Workers of this device (see worker.ts).
 // Loaded once a federation, or a parallel run, is asked for: it brings the solver with it.
-
-/**
- * What a WebWorkerCluster is from the version of @tuprolog/arg2p after 0.20.0 on: a solver of any goal, on flags that
- * can be set, which tells what its federation is. The playground may be built with a version that has none of it: its
- * cluster pairs, and runs no query.
- */
-interface SolvingCluster {
-    flags: Flags;
-    onPeersChanged: (() => void) | null;
-    readonly solver: {
-        output: (text: string) => void;
-        solve(goal: string): Promise<{ hasNext(): boolean; next(): Promise<Solution> }>;
-        /** The graph of the last solution given */
-        graph(): Graph;
-        /** Ends the goal going on: its next solution is a halt */
-        stop(): void;
-    };
-    readonly stats: {
-        readonly site: string;
-        readonly sites: readonly { id: string; workers?: number | null; delegate: boolean; via?: string | null }[];
-        readonly evaluation?: {
-            locality: string;
-            arguments: number;
-            attacks: number;
-            added: number;
-            milliseconds: number;
-            workers: readonly { partition: number; site: string; arguments: number; attacks: number }[];
-        } | null;
-    };
-}
-
-/** How often the sites of a cluster that does not tell when they change are looked at */
-const LOOK_EVERY = 1000;
 
 /**
  * A WebWorkerCluster as a solver: any goal on the theory and the flags of a run, solved by its workers and by those of
@@ -47,23 +15,10 @@ const LOOK_EVERY = 1000;
 export class WebCluster implements Cluster {
     onChange: (() => void) | null = null;
 
-    private readonly threads = workerCount();
-    private readonly cluster = new WebWorkerCluster(this.threads, workerUrl);
-    // the cluster as a solver, if this version of @tuprolog/arg2p has it
-    private readonly solving: SolvingCluster | null = 'solver' in this.cluster ? (this.cluster as unknown as SolvingCluster) : null;
-    private readonly timer: ReturnType<typeof setInterval> | undefined;
+    private readonly cluster = new WebWorkerCluster(workerCount(), workerUrl);
 
     constructor() {
-        if (this.solving !== null) {
-            this.solving.onPeersChanged = () => this.onChange?.();
-            return;
-        }
-        let seen = 0;
-        this.timer = setInterval(() => {
-            if (this.cluster.peers.length === seen) return;
-            seen = this.cluster.peers.length;
-            this.onChange?.();
-        }, LOOK_EVERY);
+        this.cluster.onPeersChanged = () => this.onChange?.();
     }
 
     invite(): Promise<string> {
@@ -78,19 +33,15 @@ export class WebCluster implements Cluster {
         return this.cluster.complete(reply);
     }
 
-    async solve({ theory, query, flags }: SolveRequest, output: (text: string) => void): Promise<ParallelRun> {
-        const cluster = this.solving;
-        if (cluster === null) {
-            throw { name: 'Parallel solver error', message: 'This version of @tuprolog/arg2p runs no query in parallel: a newer one is needed.', syntax: null };
-        }
-        const goal = query.trim().replace(/\.$/, '');
+    async solve(request: SolveRequest, output: (text: string) => void): Promise<ParallelRun> {
+        const goal = request.query.trim().replace(/\.$/, '');
         if (goal === '') throw { name: 'Query error', message: 'Query is a mandatory field.', syntax: null };
         // the flags of the run, for the evaluations from now on: the pairings stay
-        cluster.flags = Flags.parse(flags);
-        this.cluster.load(theory);
-        const solver = cluster.solver;
+        this.cluster.flags = Flags.parse(request.flags);
+        this.cluster.load(request.theory);
+        const solver = this.cluster.solver;
         solver.output = output;
-        const profile = await profileOf(cluster);
+        const profile = profileOf(request);
         const solutions = await solver.solve(goal);
         return {
             query: goal,
@@ -105,13 +56,12 @@ export class WebCluster implements Cluster {
     }
 
     stop(): void {
-        this.solving?.solver.stop();
+        this.cluster.solver.stop();
     }
 
     stats(): FederationStats {
         // as plain data: what the cluster gives is read anew every time
-        if (this.solving === null) return this.counted();
-        const { site, sites, evaluation } = this.solving.stats;
+        const { site, sites, evaluation } = this.cluster.stats;
         return {
             site,
             sites: sites.map(({ id, workers, delegate, via }) => ({ id, workers: workers ?? null, delegate, via: via ?? null })),
@@ -130,22 +80,7 @@ export class WebCluster implements Cluster {
     }
 
     close(): void {
-        clearInterval(this.timer);
         this.cluster.close();
-    }
-
-    // The federation of a cluster that tells none: its sites counted (its own Web Workers are sites too)
-    private counted(): FederationStats {
-        const self = 'This device';
-        const others = Math.max(0, this.cluster.peers.length - this.threads);
-        return {
-            site: self,
-            sites: [
-                { id: self, workers: this.threads, delegate: false, via: null },
-                ...Array.from({ length: others }, (_, i) => ({ id: `Device ${i + 1}`, workers: null, delegate: false, via: null })),
-            ],
-            evaluation: null,
-        };
     }
 }
 
@@ -159,14 +94,4 @@ function solutionData(solution: Solution, graph: GraphData): SolutionData {
         graph,
         branch: 0,
     };
-}
-
-// The profile the theory is read in (it states it, or the flags, or it is the default), asked before the goal
-async function profileOf(cluster: SolvingCluster): Promise<string> {
-    try {
-        const found = await (await cluster.solver.solve('setting(graphBuildMode, Profile)')).next();
-        return found.isYes ? (found.text('Profile') ?? '') : '';
-    } catch {
-        return '';
-    }
 }

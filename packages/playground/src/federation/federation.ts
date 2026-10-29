@@ -1,5 +1,7 @@
 import type { SolutionData, SolveRequest } from '@tuprolog/arg2p-ui/data';
-import { DEFAULT_RELAY, Inviting, decodeInvitation, decodeReply, handOff, join, type Joined, type Peer } from './pairing.js';
+import { keepSetting, setting } from '../storage.js';
+import { DEFAULT_RELAY, Inviting, decodeInvitation, decodeReply, handOff, join, type HandedOff, type InvitingOptions, type Joined, type Peer } from './pairing.js';
+import { relayUrl } from './relay.js';
 
 // The federation of the playground with the playgrounds of other devices (see Federation in the documentation of the
 // parallel solver): a cluster of the parallel solver on the Web Workers of this device, lending them to the devices it
@@ -81,11 +83,15 @@ export interface Device {
     readonly via: string | null;
 }
 
+/** The sites of the other devices of [stats]: neither this one nor the Web Workers of any */
+export function otherDevices(stats: FederationStats): SiteStats[] {
+    return stats.sites.filter(it => !it.delegate && it.id !== stats.site);
+}
+
 /** The devices of [stats]: this one first, then the others (the Web Workers of each are among its workers) */
 export function devicesOf(stats: FederationStats): Device[] {
-    const devices = stats.sites.filter(it => !it.delegate);
     const name = (id: string) => deviceName(stats, id);
-    return [...devices.filter(it => it.id === stats.site), ...devices.filter(it => it.id !== stats.site)].map(it => ({
+    return [...stats.sites.filter(it => it.id === stats.site), ...otherDevices(stats)].map(it => ({
         id: it.id,
         name: name(it.id),
         workers: it.workers,
@@ -96,7 +102,7 @@ export function devicesOf(stats: FederationStats): Device[] {
 /** The device the site [id] of [stats] is on: this one for its Web Workers, another by its rank, or the site itself */
 export function deviceName(stats: FederationStats, id: string): string {
     if (id === stats.site || stats.sites.some(it => it.delegate && it.id === id)) return 'This device';
-    const rank = stats.sites.filter(it => !it.delegate && it.id !== stats.site).findIndex(it => it.id === id);
+    const rank = otherDevices(stats).findIndex(it => it.id === id);
     return rank === -1 ? id : `Device ${rank + 1}`;
 }
 
@@ -107,20 +113,37 @@ export function workerCount(): number {
 
 const RELAY_SETTING = 'arg2p.relay';
 
+/**
+ * What a federation tells as it goes: it changed (its devices, its last evaluation, its invitation), a device was paired
+ * (with an invitation of this one, or to the one whose invitation this device joined), or the invitation going on ended
+ * by itself, with no pairing (its lifetime over, its page gone, its pairing failed)
+ */
+export type FederationEvent = 'changed' | 'paired' | 'dropped';
+
 export class Federation {
     private cluster: Promise<Cluster> | null = null;
     // the cluster, once started
     private ready: Cluster | null = null;
     // the invitation going on
     private current: Inviting | null = null;
+    // the invitations asked for: one asked for before the last is dropped as soon as it is ready
+    private invitations = 0;
+    // the other devices when this one joined an invitation: one more is the device that invited
+    private joined: number | null = null;
     private known: FederationStats | null = null;
-    private readonly listeners = new Set<() => void>();
+    private readonly listeners = new Set<(event: FederationEvent) => void>();
 
-    /** A federation of the clusters [create] makes */
-    constructor(private readonly create: () => Promise<Cluster>) {}
+    /**
+     * A federation of the clusters [create] makes; [pairing] tells how its invitations reach the relay, the other pages
+     * of this device and their page, and how long they last (as they do in the browser unless told: for tests)
+     */
+    constructor(
+        private readonly create: () => Promise<Cluster>,
+        private readonly pairing: Pick<InvitingOptions, 'fetch' | 'channels' | 'page' | 'lifetime'> = {},
+    ) {}
 
-    /** Tells [listener] whenever the federation changes: gives what stops it */
-    subscribe(listener: () => void): () => void {
+    /** Tells [listener] what the federation tells (see FederationEvent): gives what stops it */
+    subscribe(listener: (event: FederationEvent) => void): () => void {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
     }
@@ -137,25 +160,20 @@ export class Federation {
 
     /** The other devices paired: those linked, and those reached through them */
     get devices(): readonly SiteStats[] {
-        return (this.known?.sites ?? []).filter(it => !it.delegate && it.id !== this.known?.site);
+        return this.known === null ? [] : otherDevices(this.known);
     }
 
     /** The relay the replies to invitations go through (ntfy, https://ntfy.sh unless another is set) */
     get relay(): string {
-        try {
-            return localStorage.getItem(RELAY_SETTING) ?? DEFAULT_RELAY;
-        } catch {
-            return DEFAULT_RELAY;
-        }
+        return relayUrl(setting(RELAY_SETTING) ?? '') ?? DEFAULT_RELAY;
     }
 
-    set relay(url: string) {
-        try {
-            if (url.trim() === '' || url.trim() === DEFAULT_RELAY) localStorage.removeItem(RELAY_SETTING);
-            else localStorage.setItem(RELAY_SETTING, url.trim());
-        } catch {
-            // not remembered
-        }
+    /** Sets the relay to [url], or to the default one when it is empty: false when it is no https address */
+    setRelay(url: string): boolean {
+        const relay = url.trim() === '' ? DEFAULT_RELAY : relayUrl(url);
+        if (relay === null) return false;
+        keepSetting(RELAY_SETTING, relay === DEFAULT_RELAY ? null : relay);
+        return true;
     }
 
     /** The solver of the parallel runs: the cluster, started if it was not */
@@ -165,11 +183,26 @@ export class Federation {
 
     /**
      * A new invitation (the one before dropped), its link opening the playground at [base]; [reached] tells whether the
-     * relay of its replies can be read
+     * relay of its replies can be read. It fails when it is dropped before it is ready: another one asked for, the
+     * invitation dropped, the federation left.
      */
     async invite(base: string, reached: (ok: boolean) => void): Promise<string> {
         this.dropInvitation();
-        const inviting = await Inviting.start(await this.started(), { relay: this.relay, base, reached, handedOff: () => this.paired() });
+        const asked = this.invitations;
+        const cluster = await this.started();
+        if (asked !== this.invitations) throw new Error('The invitation was dropped.');
+        const inviting: Inviting = await Inviting.start(cluster, {
+            ...this.pairing,
+            relay: this.relay,
+            base,
+            reached,
+            handedOff: () => this.paired(inviting),
+            dropped: () => this.dropped(inviting),
+        });
+        if (asked !== this.invitations) {
+            inviting.close();
+            throw new Error('The invitation was dropped.');
+        }
         this.current = inviting;
         return inviting.link;
     }
@@ -181,46 +214,56 @@ export class Federation {
 
     /** Pairs with the reply to the invitation whose code is [code], once it comes */
     async pair(code: string): Promise<void> {
-        await this.invitation().pair(code);
-        this.paired();
+        const inviting = this.invitation();
+        await inviting.pair(code);
+        this.paired(inviting);
     }
 
     /** Pairs with the reply of the link [code] (scanned, pasted, or opened on this device) */
     async take(code: string): Promise<void> {
         const reply = decodeReply(code);
         if (reply === null) throw new Error('That is not the reply to an invitation.');
-        if (!(await this.invitation().take(reply))) throw new Error('That reply answers another invitation: invite again, and use its new reply.');
-        this.paired();
+        const inviting = this.invitation();
+        if (!(await inviting.take(reply))) throw new Error('That reply answers another invitation: invite again, and use its new reply.');
+        this.paired(inviting);
     }
 
-    /** Drops the invitation going on: no reply pairs with it any longer */
+    /** Drops the invitation going on, or the one being prepared: no reply pairs with it any longer */
     dropInvitation(): void {
-        this.current?.close();
+        this.invitations++;
+        const current = this.current;
         this.current = null;
+        current?.close();
     }
 
-    /** Joins the invitation of the link [code]: what to show the device that invited */
-    async join(code: string, base: string): Promise<Joined> {
+    /**
+     * Joins the invitation of the link [code]: what to show the device that invited. Cancelled with [signal], it fails,
+     * and sends that device no reply.
+     */
+    async join(code: string, base: string, signal?: AbortSignal): Promise<Joined> {
         const invitation = decodeInvitation(code);
         if (invitation === null) throw new Error('That is not an invitation.');
-        const joined = await join(await this.started(), invitation, base);
+        const cluster = await this.started();
+        signal?.throwIfAborted();
+        const joined = await join(cluster, invitation, base, { fetch: this.pairing.fetch, signal });
+        this.joined = this.devices.length;
         this.changed();
         return joined;
     }
 
     /** Hands the reply of the link [code], opened in this page, to the page of this device that invited */
-    handOff(code: string): ReturnType<typeof handOff> {
+    handOff(code: string): Promise<HandedOff> {
         const reply = decodeReply(code);
-        return reply === null ? Promise.resolve({ paired: false, message: 'That is not the reply to an invitation.' }) : handOff(reply);
+        return reply === null ? Promise.resolve({ paired: false, message: 'That is not the reply to an invitation.' }) : handOff(reply, { channels: this.pairing.channels });
     }
 
-    /** Leaves the federation: the links to the other devices close, and the Web Workers stop */
+    /** Leaves the federation: the links to the other devices close, and the Web Workers stop (those starting once started) */
     leave(): void {
         this.dropInvitation();
-        // one still starting is closed once started
         this.ready?.close();
         this.ready = null;
         this.cluster = null;
+        this.joined = null;
         this.changed();
     }
 
@@ -229,12 +272,23 @@ export class Federation {
         return this.current;
     }
 
-    private paired(): void {
-        this.current = null;
+    // [inviting] paired
+    private paired(inviting: Inviting): void {
+        if (this.current === inviting) this.current = null;
         this.changed();
+        this.tell('paired');
     }
 
-    private started(): Promise<Cluster> {
+    // [inviting] ended by itself, with no pairing: told when it is the one going on
+    private dropped(inviting: Inviting): void {
+        if (this.current !== inviting) return;
+        this.current = null;
+        this.changed();
+        this.tell('dropped');
+    }
+
+    // The cluster, started if it was not: a failure when the federation is left meanwhile
+    private async started(): Promise<Cluster> {
         if (this.cluster === null) {
             const cluster = this.create();
             this.cluster = cluster;
@@ -252,11 +306,23 @@ export class Federation {
                 },
             );
         }
-        return this.cluster;
+        const cluster = this.cluster;
+        const started = await cluster;
+        if (this.cluster !== cluster) throw new Error('The federation was left.');
+        return started;
     }
 
     private changed(): void {
         this.known = this.ready?.stats() ?? null;
-        this.listeners.forEach(it => it());
+        this.tell('changed');
+        // the device whose invitation this one joined is linked
+        if (this.joined !== null && this.devices.length > this.joined) {
+            this.joined = null;
+            this.tell('paired');
+        }
+    }
+
+    private tell(event: FederationEvent): void {
+        this.listeners.forEach(it => it(event));
     }
 }

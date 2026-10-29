@@ -49,32 +49,3 @@ export function codeIn(text: string, kind: PairingKind): string | null {
     const pairing = readPairing(hash);
     return pairing !== null && pairing.kind === kind ? pairing.code : null;
 }
-
-// The launch queue of an installed app (not in every browser yet)
-interface Launching {
-    launchQueue?: { setConsumer(consumer: (params: { targetURL?: string }) => void): void };
-}
-
-/**
- * Follows the links of pairings opened in [target], a window: the one it was opened with, those opened in it once open
- * (its fragment changes), and those an installed playground is launched with (they focus the page open, see
- * launch_handler in the manifest, rather than load another). Each leaves the address bar, so that a reload does not
- * open it again, and is told [opened] once. Gives what stops following them.
- */
-export function followPairingLinks(target: Window & Launching, opened: (link: PairingLink) => void): () => void {
-    let last: string | null = null;
-    const take = (url: string) => {
-        const link = readPairing(new URL(url, target.location.href).hash);
-        if (link === null) return;
-        if (target.location.hash !== '') target.history.replaceState(null, '', target.location.pathname + target.location.search);
-        // the link a page is launched with comes by its address and by the launch queue
-        if (link.code === last) return;
-        last = link.code;
-        opened(link);
-    };
-    const changed = () => take(target.location.href);
-    take(target.location.href);
-    target.addEventListener('hashchange', changed);
-    target.launchQueue?.setConsumer(params => params.targetURL !== undefined && take(params.targetURL));
-    return () => target.removeEventListener('hashchange', changed);
-}

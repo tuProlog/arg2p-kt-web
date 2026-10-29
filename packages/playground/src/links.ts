@@ -1,5 +1,6 @@
 import { toTheory, type Framework } from '@tuprolog/arg2p-ui/data';
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
+import { fromBase64url, toBase64url } from './base64url.js';
 import { migratedContent, type Content } from './documents.js';
 
 // Links to the playground as it is: the theory, query and flags of a document, packed into a single `s` parameter, a
@@ -97,14 +98,14 @@ export function shareUrl(content: Content, base: string): string {
     url.search = '';
     url.hash = '';
     const state = [VERSION, content.flags, content.theory, content.query];
-    url.searchParams.set(SHARED, toBase64Url(deflateSync(strToU8(JSON.stringify(state)), { level: 9, dictionary: DICTIONARY_V2 })));
+    url.searchParams.set(SHARED, toBase64url(deflateSync(strToU8(JSON.stringify(state)), { level: 9, dictionary: DICTIONARY_V2 })));
     return url.toString();
 }
 
 function unpacked(packed: string, errors: string[]): Partial<Content> | null {
     let bytes: Uint8Array;
     try {
-        bytes = fromBase64Url(packed);
+        bytes = fromBase64url(packed);
     } catch {
         errors.push('The shared state in the link is damaged and was ignored.');
         return null;
@@ -184,15 +185,4 @@ function items(raw: string | null): string[] {
         .split(/[,;]/)
         .map(it => it.trim())
         .filter(it => it.length > 0);
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-    let binary = '';
-    bytes.forEach(it => (binary += String.fromCharCode(it)));
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromBase64Url(text: string): Uint8Array {
-    const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
-    return Uint8Array.from(binary, it => it.charCodeAt(0));
 }
