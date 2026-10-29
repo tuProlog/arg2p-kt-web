@@ -1,3 +1,5 @@
+import { fromBase64url, toBase64url } from '../base64url.js';
+import { messageOf } from '../errors.js';
 import { pairingLink } from './links.js';
 import { Relay, type Fetch } from './relay.js';
 
@@ -79,7 +81,7 @@ function isToken(text: string | undefined): text is string {
 
 /** A topic of the relay no one else picks: random */
 export function newTopic(): string {
-    return `arg2p-${base64url(random(12))}`;
+    return `arg2p-${toBase64url(random(12))}`;
 }
 
 /** A code to type, random */
@@ -95,14 +97,14 @@ export function normalCode(text: string): string {
 /** A new key to seal the replies with (AES-GCM, 128 bits), as text */
 export async function newKey(): Promise<string> {
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 128 }, true, ['encrypt', 'decrypt']);
-    return base64url(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
+    return toBase64url(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
 }
 
 /** [text] sealed with [key]: readable only with it */
 export async function seal(key: string, text: string): Promise<string> {
     const iv = random(12);
     const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await importKey(key), new TextEncoder().encode(text));
-    return base64url(concat(iv, new Uint8Array(sealed)));
+    return toBase64url(concat(iv, new Uint8Array(sealed)));
 }
 
 /** What [sealed] says, opened with [key]: fails when it was sealed with another, or changed */
@@ -306,13 +308,6 @@ export function handOff(reply: Reply, wait = 8000, channels: Channels = broadcas
     });
 }
 
-/** The message of [error], whatever it is */
-export function messageOf(error: unknown): string {
-    if (error instanceof Error) return error.message;
-    if (typeof error === 'object' && error !== null && 'message' in error) return String(error.message);
-    return String(error);
-}
-
 function random(length: number): Uint8Array<ArrayBuffer> {
     return crypto.getRandomValues(new Uint8Array(length));
 }
@@ -322,15 +317,4 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array<ArrayBuffer> {
     joined.set(a);
     joined.set(b, a.length);
     return joined;
-}
-
-function base64url(bytes: Uint8Array): string {
-    let binary = '';
-    bytes.forEach(byte => (binary += String.fromCharCode(byte)));
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
-    const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
-    return Uint8Array.from(binary, char => char.charCodeAt(0));
 }

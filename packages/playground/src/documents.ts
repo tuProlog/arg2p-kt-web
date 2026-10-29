@@ -1,4 +1,4 @@
-import { DEFAULT_FLAGS, toTheory, type Framework } from '@tuprolog/arg2p-ui/data';
+import { DEFAULT_FLAGS, DEFAULT_PROFILE, statedProfile, toTheory, type Framework } from '@tuprolog/arg2p-ui/data';
 
 // The working memory of the playground, like the tabs of a text editor: every theory worked on is a document (its
 // theory, query and flags), kept in the browser and restored on the next visit. Closed documents are kept for a while
@@ -51,6 +51,11 @@ export interface Workspace {
 export interface Storage {
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
+}
+
+/** The profile [content] is read in: the one its theory states, or else its flags, or else the default one */
+export function profileOf({ theory, flags }: Pick<Content, 'theory' | 'flags'>): string {
+    return statedProfile(theory) ?? statedProfile(flags) ?? DEFAULT_PROFILE;
 }
 
 export function blank(): Content {

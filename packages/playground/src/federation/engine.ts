@@ -9,8 +9,8 @@ import {
     type SolveRequest,
     type SyntaxProblem,
 } from '@tuprolog/arg2p-ui/data';
+import { messageOf } from '../errors.js';
 import type { ParallelSolver } from './federation.js';
-import { messageOf } from './pairing.js';
 
 const STOPPED: EngineError = { name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true };
 

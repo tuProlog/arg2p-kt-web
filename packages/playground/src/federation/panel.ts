@@ -1,10 +1,11 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { messageOf } from '../errors.js';
 import '../share.js';
 import { controls } from '../styles.js';
 import { deviceName, devicesOf, workerCount, type Federation, type FederationStats } from './federation.js';
 import { codeIn, followPairingLinks, type PairingKind, type PairingLink } from './links.js';
-import { DEFAULT_RELAY, decodeInvitation, decodeReply, messageOf, type Joined } from './pairing.js';
+import { DEFAULT_RELAY, decodeInvitation, decodeReply, type Joined } from './pairing.js';
 import { qrSvg, scanQr } from './qr.js';
 
 /** Where a pairing is, as this device shows it */

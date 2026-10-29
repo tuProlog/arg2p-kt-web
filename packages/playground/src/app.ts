@@ -2,11 +2,9 @@ import '@tuprolog/arg2p-ui/editor';
 import '@tuprolog/arg2p-ui/solver';
 import type { Arg2pEditor, Arg2pSolver } from '@tuprolog/arg2p-ui';
 import {
-    DEFAULT_PROFILE,
     declaredFramework,
     frameworkOf,
     parseFramework,
-    statedProfile,
     toApx,
     toTgf,
     toTheory,
@@ -16,7 +14,7 @@ import {
 } from '@tuprolog/arg2p-ui/data';
 import { JsEngine } from '@tuprolog/arg2p-ui/js';
 import { LitElement, html, nothing } from 'lit';
-import { blank, DEFAULT_QUERY, type Content, type Workspace } from './documents.js';
+import { blank, DEFAULT_QUERY, profileOf, type Content, type Workspace } from './documents.js';
 import { EXAMPLES, type Example } from './examples.js';
 import { ClusterEngine } from './federation/engine.js';
 import { Federation, workerCount } from './federation/federation.js';
@@ -25,9 +23,10 @@ import { downloadText, fileName, pickFile } from './files.js';
 import { loadLayout, saveLayout, type Layout } from './layout.js';
 import { read, shareUrl } from './links.js';
 import { Menus } from './menus.js';
-import { Session, browserStorage } from './session.js';
+import { Session } from './session.js';
 import type { Arg2pShare } from './share.js';
 import './share.js';
+import { browserStorage } from './storage.js';
 import { styles } from './styles.js';
 import './tabs.js';
 import { currentTheme, followSystem, toggleTheme } from './theme.js';
@@ -167,7 +166,7 @@ export class Arg2pPlayground extends LitElement {
     }
 
     private get abstract(): boolean {
-        return (statedProfile(this.content.theory) ?? statedProfile(this.content.flags) ?? DEFAULT_PROFILE) === 'abstract';
+        return profileOf(this.content) === 'abstract';
     }
 
     private get name(): string {

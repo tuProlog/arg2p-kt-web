@@ -179,16 +179,3 @@ export class Session {
         this.listener.changed(this.workspace, this.active);
     }
 }
-
-/** localStorage, or a memory that lasts the visit alone when it cannot be used (private mode, storage disabled) */
-export function browserStorage(): Storage {
-    try {
-        const probe = 'arg2p.probe';
-        window.localStorage.setItem(probe, probe);
-        window.localStorage.removeItem(probe);
-        return window.localStorage;
-    } catch {
-        const items = new Map<string, string>();
-        return { getItem: key => items.get(key) ?? null, setItem: (key, value) => void items.set(key, `${value}`) };
-    }
-}

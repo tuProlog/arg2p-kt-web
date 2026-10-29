@@ -1,4 +1,5 @@
 import type { SolutionData, SolveRequest } from '@tuprolog/arg2p-ui/data';
+import { keepSetting, setting } from '../storage.js';
 import { DEFAULT_RELAY, Inviting, decodeInvitation, decodeReply, handOff, join, type Joined, type Peer } from './pairing.js';
 
 // The federation of the playground with the playgrounds of other devices (see Federation in the documentation of the
@@ -81,11 +82,15 @@ export interface Device {
     readonly via: string | null;
 }
 
+/** The sites of the other devices of [stats]: neither this one nor the Web Workers of any */
+export function otherDevices(stats: FederationStats): SiteStats[] {
+    return stats.sites.filter(it => !it.delegate && it.id !== stats.site);
+}
+
 /** The devices of [stats]: this one first, then the others (the Web Workers of each are among its workers) */
 export function devicesOf(stats: FederationStats): Device[] {
-    const devices = stats.sites.filter(it => !it.delegate);
     const name = (id: string) => deviceName(stats, id);
-    return [...devices.filter(it => it.id === stats.site), ...devices.filter(it => it.id !== stats.site)].map(it => ({
+    return [...stats.sites.filter(it => it.id === stats.site), ...otherDevices(stats)].map(it => ({
         id: it.id,
         name: name(it.id),
         workers: it.workers,
@@ -96,7 +101,7 @@ export function devicesOf(stats: FederationStats): Device[] {
 /** The device the site [id] of [stats] is on: this one for its Web Workers, another by its rank, or the site itself */
 export function deviceName(stats: FederationStats, id: string): string {
     if (id === stats.site || stats.sites.some(it => it.delegate && it.id === id)) return 'This device';
-    const rank = stats.sites.filter(it => !it.delegate && it.id !== stats.site).findIndex(it => it.id === id);
+    const rank = otherDevices(stats).findIndex(it => it.id === id);
     return rank === -1 ? id : `Device ${rank + 1}`;
 }
 
@@ -137,25 +142,16 @@ export class Federation {
 
     /** The other devices paired: those linked, and those reached through them */
     get devices(): readonly SiteStats[] {
-        return (this.known?.sites ?? []).filter(it => !it.delegate && it.id !== this.known?.site);
+        return this.known === null ? [] : otherDevices(this.known);
     }
 
     /** The relay the replies to invitations go through (ntfy, https://ntfy.sh unless another is set) */
     get relay(): string {
-        try {
-            return localStorage.getItem(RELAY_SETTING) ?? DEFAULT_RELAY;
-        } catch {
-            return DEFAULT_RELAY;
-        }
+        return setting(RELAY_SETTING) ?? DEFAULT_RELAY;
     }
 
     set relay(url: string) {
-        try {
-            if (url.trim() === '' || url.trim() === DEFAULT_RELAY) localStorage.removeItem(RELAY_SETTING);
-            else localStorage.setItem(RELAY_SETTING, url.trim());
-        } catch {
-            // not remembered
-        }
+        keepSetting(RELAY_SETTING, url.trim() === '' || url.trim() === DEFAULT_RELAY ? null : url.trim());
     }
 
     /** The solver of the parallel runs: the cluster, started if it was not */
