@@ -1,9 +1,10 @@
+import { FLAGS } from '../flags/schema.js';
 import { ATOM } from './atoms.js';
 import type { Framework } from './frameworks.js';
 
 // The arguments and attacks a theory of the profile abstract declares, as written in it (`a.`, `arg(a).`, `a -> b.`,
 // `att(a, b).`, `a <-> b.`), and the theory rewritten for a framework drawn: only those clauses change, every other
-// (the profile, comments, the clauses that derive attacks) stays as it is.
+// (the profile, the switches of the flags, comments, the clauses that derive attacks) stays as it is.
 
 /** A clause of a theory: where it is, from its first character to its full stop included, and its text */
 interface Clause {
@@ -23,6 +24,8 @@ const ARGUMENT_ARG = new RegExp(`^arg\\s*\\(\\s*${NAME}\\s*\\)$`);
 const ATTACK_ARROW = new RegExp(`^${NAME}\\s*->\\s*${NAME}$`);
 const ATTACK_ATT = new RegExp(`^att\\s*\\(\\s*${NAME}\\s*,\\s*${NAME}\\s*\\)$`);
 const MUTUAL = new RegExp(`^${NAME}\\s*<->\\s*${NAME}$`);
+// A fact of one of these names turns a flag on (`queryMode.`): the solver reads it as no argument
+const SWITCHES = new Set(FLAGS.filter(it => it.kind === 'switch').map(it => it.name));
 
 /** The framework [theory] declares: its arguments in the order they are met, with those its attacks name */
 export function declaredFramework(theory: string): Framework {
@@ -136,7 +139,7 @@ function declarations(theory: string): { clause: Clause; declaration: Declaratio
 
 function declarationOf(text: string): Declaration | null {
     let match: RegExpExecArray | null;
-    if ((match = ARGUMENT_FACT.exec(text))) return { kind: 'argument', name: match[1], form: 'fact' };
+    if ((match = ARGUMENT_FACT.exec(text))) return SWITCHES.has(match[1]) ? null : { kind: 'argument', name: match[1], form: 'fact' };
     if ((match = ARGUMENT_ARG.exec(text))) return { kind: 'argument', name: match[1], form: 'arg' };
     if ((match = ATTACK_ARROW.exec(text))) return { kind: 'attack', from: match[1], to: match[2], form: 'arrow' };
     if ((match = ATTACK_ATT.exec(text))) return { kind: 'attack', from: match[1], to: match[2], form: 'att' };
