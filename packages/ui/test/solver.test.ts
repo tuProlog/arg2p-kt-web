@@ -360,6 +360,38 @@ describe('<arg2p-solver>', function () {
         equal(find<HTMLElement>('.panel.results').hidden, false);
     });
 
+    it('should be tabs as WAI-ARIA has them: each with its panel, picked with the arrows', async function () {
+        const { element, events, find, root } = await solver(new Fake([]), it => {
+            it.innerHTML = '<div slot="tab" id="mine" label="Mine">mine</div>';
+        });
+        const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('[role=tab]')];
+        deepEqual(
+            tabs().map(it => it.getAttribute('aria-controls')),
+            ['panel-results', 'panel-flags', 'panel-console', 'panel-hosted'],
+        );
+        equal(find('#panel-flags').getAttribute('aria-labelledby'), 'tab-flags');
+        equal(element.querySelector('#mine')!.getAttribute('aria-label'), 'Mine');
+        // the tab picked alone is reached with Tab
+        deepEqual(tabs().map(it => it.tabIndex), [0, -1, -1, -1]);
+        const key = (key: string) => root.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, composed: true }));
+        tabs()[0].focus();
+        key('ArrowRight');
+        await element.updateComplete;
+        equal(element.tab, 'flags');
+        equal(root.activeElement, tabs()[1]);
+        deepEqual(tabs().map(it => it.tabIndex), [-1, 0, -1, -1]);
+        key('End');
+        await element.updateComplete;
+        equal(element.tab, 'mine');
+        key('ArrowRight');
+        await element.updateComplete;
+        equal(element.tab, 'results');
+        key('ArrowLeft');
+        await element.updateComplete;
+        equal(element.tab, 'mine');
+        deepEqual(events.filter(it => it.type === 'arg2p-tab-change').map(it => it.detail.tab), ['flags', 'mine', 'results', 'mine']);
+    });
+
     it('should share the places of the arguments between the graph and the drawing', async function () {
         const theory = 'graphBuildMode(abstract).\na.\nb.\na -> b.\n';
         const { element, find } = await solver(new Fake([yes(ABSTRACT)]), it => (it.theory = theory));

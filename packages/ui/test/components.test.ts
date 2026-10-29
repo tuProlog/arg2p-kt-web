@@ -279,6 +279,29 @@ describe('<arg2p-solutions>', function () {
         deepEqual(picked, [error]);
     });
 
+    it('should be picked with buttons, and tell readers of the screen what it is doing in a region there all along', async function () {
+        const solutions = await element<Arg2pSolutions>('arg2p-solutions');
+        const live = () => solutions.shadowRoot!.querySelector('[role=status]');
+        ok(live());
+        let release = () => {};
+        const held: Run = { ...run([solution('yes'), solution('yes')]), next: () => new Promise(resolve => (release = () => resolve(solution('yes')))) };
+        const first = solutions.start(held);
+        await solutions.updateComplete;
+        equal(live()!.textContent, 'Solving…');
+        release();
+        await first;
+        await solutions.updateComplete;
+        equal(live()!.textContent, '');
+        const pick = solutions.shadowRoot!.querySelector<HTMLButtonElement>('.solution .pick')!;
+        equal(pick.getAttribute('aria-pressed'), 'true');
+        equal(solutions.shadowRoot!.querySelector('[role=button]'), null);
+        // an error that tells where it is
+        solutions.fail({ name: 'Theory error', message: 'm', syntax: { line: 1, column: 1, length: 1, message: 'm', where: 'theory' } });
+        await solutions.updateComplete;
+        ok(solutions.shadowRoot!.querySelector('.halt .pick'));
+        ok(live());
+    });
+
     it('should tell when a solution could not be computed', async function () {
         const solutions = await element<Arg2pSolutions>('arg2p-solutions');
         const failures: unknown[] = [];

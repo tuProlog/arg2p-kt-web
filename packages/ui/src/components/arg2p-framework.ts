@@ -292,7 +292,13 @@ export class Arg2pFramework extends CanvasElement {
                       `}
                 ${this.renderPng('framework')}
             </div>
-            <div class="area" tabindex="0" @keydown=${(e: KeyboardEvent) => this.onKey(e)}>
+            <div
+                class="area"
+                tabindex="0"
+                role="group"
+                aria-label=${this.readonly ? 'The framework drawn' : 'The framework drawn: Delete removes what is selected, Escape goes back to selecting'}
+                @keydown=${(e: KeyboardEvent) => this.onKey(e)}
+            >
                 <div class="canvas"></div>
                 ${this.renderPopup()}
                 ${this.drawnArguments.some(it => it.derived) || this.drawnAttacks.some(it => it.derived)
@@ -365,8 +371,11 @@ export class Arg2pFramework extends CanvasElement {
             .hint + .png {
                 margin-left: 0;
             }
-            .area {
+            .area:focus {
                 outline: none;
+            }
+            .area:focus-visible {
+                box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--_accent) 45%, transparent);
             }
             .legend {
                 position: absolute;
