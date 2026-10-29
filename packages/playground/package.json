@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@tuprolog/arg2p": "0.21.0",
-    "@tuprolog/arg2p-ui": "0.3.1",
+    "@tuprolog/arg2p-ui": "0.3.2",
     "fflate": "0.8.3",
     "jsqr": "1.4.0",
     "lit": "3.3.3",
