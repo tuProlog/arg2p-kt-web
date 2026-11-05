@@ -2,7 +2,7 @@ import { Arg2p, Flags, Value, type Solutions } from '@tuprolog/arg2p';
 import { EMPTY_GRAPH, type EngineError, type GraphData, type SolutionData, type SyntaxProblem } from '../engine.js';
 import { FLAGS, type Settings } from '../flags/schema.js';
 import { unquote } from '../formats/atoms.js';
-import { graphData } from './graph.js';
+import { compactGraphData } from './graph.js';
 
 // The solver's side of the engine of the browser (see JsEngine): it answers messages, posting its answers with `post`.
 // Kept apart from the worker, so that it runs (and is tested) anywhere.
@@ -35,8 +35,6 @@ export type Answer =
     | { type: 'checked'; reqId: number; problem: SyntaxProblem | null }
     | { type: 'settings'; reqId: number; settings: Settings };
 
-const WARM_UP_THEORY = 'f1 :=> bird(tweety).\nr1 : bird(X) => flies(X).\nf2 :=> -flies(tweety).';
-
 export function createHost(post: (answer: Answer) => void): { handle(request: Request): void } {
     let current: { id: number; solver: Arg2p; solutions: Solutions; profile: string } | null = null;
 
@@ -55,7 +53,7 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
     // unseen, in the background
     function warmUp(): void {
         try {
-            Arg2p.of(WARM_UP_THEORY).answer('flies(tweety)');
+            Arg2p.warmUp();
         } catch {
             // only a warm-up
         }
@@ -125,7 +123,7 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
     function graphAt({ id, branch, reqId }: { id: number; branch: number; reqId: number }): void {
         let graph = EMPTY_GRAPH;
         try {
-            if (current !== null && current.id === id) graph = graphData(current.solver.graphAt(branch), current.profile);
+            if (current !== null && current.id === id) graph = compactGraphData(current.solver.compactGraphAt(branch), current.profile);
         } catch {
             // a stage that cannot be read shows as empty
         }
@@ -139,7 +137,7 @@ export function createHost(post: (answer: Answer) => void): { handle(request: Re
 function currentGraph(solver: Arg2p, profile: string): { graph: GraphData; branch: number } {
     try {
         const branch = solver.activeBranch;
-        return { graph: graphData(solver.graphAt(branch), profile), branch };
+        return { graph: compactGraphData(solver.compactGraphAt(branch), profile), branch };
     } catch {
         return { graph: EMPTY_GRAPH, branch: 0 };
     }

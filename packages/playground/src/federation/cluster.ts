@@ -1,6 +1,6 @@
 import { Flags, WebWorkerCluster, type Solution } from '@tuprolog/arg2p';
 import type { GraphData, SolutionData, SolveRequest } from '@tuprolog/arg2p-ui/data';
-import { graphData } from '@tuprolog/arg2p-ui/js';
+import { compactGraphData } from '@tuprolog/arg2p-ui/js';
 import { profileOf } from '../documents.js';
 import { workerCount, type Cluster, type FederationStats, type ParallelRun } from './federation.js';
 import workerUrl from './worker.ts?worker&url';
@@ -43,14 +43,17 @@ export class WebCluster implements Cluster {
         solver.output = output;
         const profile = profileOf(request);
         const solutions = await solver.solve(goal);
+        // whether there is another, known only by looking for it
+        let more = await solutions.hasNext();
         return {
             query: goal,
-            hasNext: () => solutions.hasNext(),
+            hasNext: () => more,
             next: async () => {
                 const solution = await solutions.next();
+                more = await solutions.hasNext();
                 // what the evaluation built is told once it is over
                 this.onChange?.();
-                return solutionData(solution, graphData(solver.graph(), profile));
+                return solutionData(solution, compactGraphData(solver.compactGraph(), profile));
             },
         };
     }

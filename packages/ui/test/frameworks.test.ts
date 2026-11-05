@@ -87,9 +87,9 @@ describe('Framework declarations', function () {
     });
 
     it('should read no argument in the switches of the flags, and leave them as they are', function () {
-        const switched = 'graphBuildMode(abstract).\nqueryMode.\na.\ndebug.\narg(metaRules).\nb -> a.\n';
+        const switched = 'graphBuildMode(abstract).\nqueryMode.\na.\nmetaConflicts.\narg(metaRules).\nb -> a.\n';
         deepEqual(declaredFramework(switched), { arguments: ['a', 'metaRules', 'b'], attacks: [{ from: 'b', to: 'a' }] });
-        equal(redrawn(switched, { arguments: ['a'], attacks: [] }), 'graphBuildMode(abstract).\nqueryMode.\na.\ndebug.\n');
+        equal(redrawn(switched, { arguments: ['a'], attacks: [] }), 'graphBuildMode(abstract).\nqueryMode.\na.\nmetaConflicts.\n');
     });
 
     it('should leave a theory drawn as it is as it is', function () {
