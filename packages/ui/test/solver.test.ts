@@ -316,13 +316,13 @@ describe('<arg2p-solver>', function () {
     it('should tell the query and the flags as they are edited, once', async function () {
         const { events, find } = await solver(new Fake([]));
         find<Arg2pEditor>('#query').dispatchEvent(new CustomEvent('arg2p-change', { detail: { value: 'q(X)' }, bubbles: true, composed: true }));
-        find('arg2p-flags').dispatchEvent(new CustomEvent('arg2p-flags-change', { detail: { flags: 'debug.' }, bubbles: true, composed: true }));
+        find('arg2p-flags').dispatchEvent(new CustomEvent('arg2p-flags-change', { detail: { flags: 'metaRules.' }, bubbles: true, composed: true }));
         deepEqual(
             events.map(it => it.type),
             ['arg2p-query-change', 'arg2p-flags-change'],
         );
         deepEqual(events[0].detail, { query: 'q(X)' });
-        deepEqual(events[1].detail, { flags: 'debug.' });
+        deepEqual(events[1].detail, { flags: 'metaRules.' });
     });
 
     it('should show the tabs of the page after its own, the one picked alone', async function () {

@@ -135,7 +135,9 @@ describe('Settings in effect', function () {
         const abstract = settings('graphBuildMode(abstract).\na -> b.', DEFAULT_FLAGS);
         deepEqual(abstract.graphBuildMode, ['abstract']);
         deepEqual(abstract.graphExtension, []);
-        deepEqual(abstract.queryMode, []);
+        // the flags stated for the solver before the profile, which presets what they do not state
+        deepEqual(abstract.queryMode, ['true']);
+        deepEqual(settings('graphBuildMode(abstract).\na -> b.', '').queryMode, []);
         deepEqual(abstract.graphBuilder, ['abstractGraph']);
 
         deepEqual(settings(TWEETY, `${DEFAULT_FLAGS}autoTransposition(off).\n`).autoTransposition, []);
@@ -155,6 +157,7 @@ describe('Settings in effect', function () {
         deepEqual(options('argumentLabellingMode'), values(api.Semantics));
         deepEqual(options('statementLabellingMode'), values(api.StatementLabelling));
         deepEqual(options('graphExtension'), values(api.GraphExtension));
+        deepEqual(options('answerMode'), values(api.AnswerMode));
         deepEqual(options('orderingPrinciple'), values(api.OrderingPrinciple));
         deepEqual(options('orderingComparator'), values(api.OrderingComparator));
         deepEqual(options('graphLanguage'), values(api.GraphLanguage));

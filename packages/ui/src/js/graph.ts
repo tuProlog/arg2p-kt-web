@@ -1,4 +1,4 @@
-import type { Graph } from '@tuprolog/arg2p';
+import type { CompactGraph, Graph } from '@tuprolog/arg2p';
 import type { GraphData } from '../engine.js';
 
 // The graphs of @tuprolog/arg2p as the components read them: of a solver of the page (see host), or of a cluster of
@@ -21,6 +21,31 @@ export function graphData(graph: Graph, profile = ''): GraphData {
             to: it.target.identifier,
             type: it.type ?? null,
             on: it.on?.identifier ?? null,
+        })),
+    };
+}
+
+/** A compact graph of the API as the same plain data, read in [profile]: no object of the API for an argument */
+export function compactGraphData(graph: CompactGraph, profile = ''): GraphData {
+    const { texts, conclusions, topRules, attackers, targets, on, attackTypeOf, attackTypes, supporters, supported } = graph;
+    const ids = Array.from({ length: graph.size }, (_, position) => graph.identifier(position));
+    const supports: string[][] = ids.map(() => []);
+    supported.forEach((argument, i) => supports[argument].push(ids[supporters[i]]));
+    return {
+        profile,
+        arguments: Array.from(graph.order, position => ({
+            id: ids[position],
+            descriptor: graph.descriptor(position),
+            conclusion: texts[conclusions[position]],
+            topRule: texts[topRules[position]],
+            label: graph.label(position),
+            supports: supports[position],
+        })),
+        attacks: Array.from(attackers, (attacker, i) => ({
+            from: ids[attacker],
+            to: ids[targets[i]],
+            type: attackTypes[attackTypeOf[i]],
+            on: ids[on[i]],
         })),
     };
 }
