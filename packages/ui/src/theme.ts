@@ -25,6 +25,15 @@ const LIGHT = {
     functor: '#6a1b9a',
     variable: 'var(--_text)',
     comment: '#808080',
+    // the tones of the marks of an editor (see EditorMark): what a page links, told apart by colour
+    'tone-0': '#2671d9',
+    'tone-1': '#e6862a',
+    'tone-2': '#2ca02c',
+    'tone-3': '#c2185b',
+    'tone-4': '#8a5cc2',
+    'tone-5': '#8c6d1f',
+    'tone-6': '#17a2b8',
+    'tone-7': '#d4a017',
     font: 'system-ui, sans-serif',
     mono: 'ui-monospace, monospace',
 } as const;

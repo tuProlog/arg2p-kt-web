@@ -58,6 +58,36 @@ describe('Links', function () {
         deepEqual(read(`?s=${future}`).errors, ['The shared state in the link comes from an unsupported version and was ignored.']);
     });
 
+    it('should share a text with the theory formalizing it, and how', function () {
+        const formalization = {
+            framework: 'structured' as const,
+            links: [{ statement: 'r1', quote: 'Birds normally fly' }],
+            glossary: [{ term: 'r1', meaning: 'birds fly' }],
+            ledger: [{ point: 'normally', readings: 'strict or defeasible', chosen: 'defeasible' }],
+            notes: 'Tweety is assumed a bird.',
+            model: 'anthropic/claude-haiku-5.5',
+            cost: 0.0004,
+        };
+        const content = { theory: 'r1 : bird(X) => flies(X).\n', query: DEFAULT_QUERY, flags: '', text: 'Birds normally fly. Città.', formalization };
+        deepEqual(read(new URL(shareUrl(content, BASE)).search), { content, errors: [] });
+        const text = { theory: '', query: DEFAULT_QUERY, flags: '', text: 'Only a text.' };
+        deepEqual(read(new URL(shareUrl(text, BASE)).search).content, text);
+    });
+
+    it('should share a document with no text as before, and read a formalization without trusting it', function () {
+        const plain = { theory: 'a.', query: 'a', flags: '', text: '  ', formalization: null };
+        deepEqual(read(new URL(shareUrl(plain, BASE)).search).content, { theory: 'a.', query: 'a', flags: '' });
+        const v3 = (state: unknown[]) => base64url(deflateSync(strToU8(JSON.stringify(state))));
+        deepEqual(read(`?s=${v3([3, '', 'a.', 'a', 'T', { links: [{ statement: 'a', quote: 1 }, { statement: 'a', quote: 'T' }], cost: 'x' }])}`).content, {
+            theory: 'a.',
+            query: 'a',
+            flags: '',
+            text: 'T',
+            formalization: { framework: 'structured', links: [{ statement: 'a', quote: 'T' }], glossary: [], ledger: [], notes: '', model: '', cost: null },
+        });
+        deepEqual(read(`?s=${v3([3, '', 'a.', 'a', 7, 'nonsense'])}`).content, { theory: 'a.', query: 'a', flags: '' });
+    });
+
     // Links shared with format version 1 (structured and abstract): if this breaks, links already out there break
     // too. Change the format by adding a new version instead.
     it('should keep reading links of version 1', function () {

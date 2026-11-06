@@ -55,6 +55,33 @@ export function curveOf(from: { x: number; y: number }, to: { x: number; y: numb
     return Math.max(MIN_CURVE, Math.min(CURVE, (CURVE * CURVE_LENGTH) / length));
 }
 
+/**
+ * The statement of the theory [argument] comes from: the rule it is built by last, or for a premise (an axiom, an
+ * ordinary premise) the name the theory gives it, or the argument itself in an abstract framework. By it a page links
+ * the argument to what the statement is about (the passage of a text it formalizes, say).
+ */
+export function statementOf(argument: ArgumentData, abstract: boolean): string {
+    if (abstract) return argument.conclusion;
+    if (argument.topRule !== 'none') return argument.topRule;
+    // `A0 : f1 : bird(tweety)`: the premise is named between the identifier and the conclusion
+    return argument.descriptor.split(' : ')[1]?.trim() ?? argument.id;
+}
+
+/** The statement [statement] stands for: itself, or the rule a transposed one comes from (`r1_i`, `r1_i2` -> `r1`) */
+export function sourceStatement(statement: string): string {
+    return statement.replace(/_i\d*$/, '');
+}
+
+/** Whether [statement] is among [linked], itself or as the rule it is a transposition of */
+/** The passages [passages] gives for [statement], or for the rule it is transposed from */
+export function passagesOf(passages: Readonly<Record<string, readonly string[]>>, statement: string): readonly string[] {
+    return passages[statement] ?? passages[sourceStatement(statement)] ?? [];
+}
+
+export function isLinked(statement: string, linked: ReadonlySet<string>): boolean {
+    return linked.has(statement) || linked.has(sourceStatement(statement));
+}
+
 /** The kind of [argument]: an assumption (ABA), a premise (no top rule), or one built by its top rule */
 export function kindOf(argument: ArgumentData, abstract: boolean): 'abstract' | 'assumption' | 'premise' | 'rule' {
     if (abstract) return 'abstract';

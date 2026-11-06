@@ -401,3 +401,59 @@ describe('<arg2p-solver>', function () {
         deepEqual(find<Arg2pGraph>('arg2p-graph').positions!.a, { x: 7, y: 9 });
     });
 });
+
+// A fake whose runs print as they give each solution
+class Printing extends Fake {
+    override solve(request: SolveRequest, output: (text: string) => void = () => {}): Promise<Run> {
+        return super.solve(request, output).then(run => ({
+            query: run.query,
+            hasNext: () => run.hasNext(),
+            next: () => {
+                output('+');
+                return run.next();
+            },
+            graphAt: (branch: number) => run.graphAt(branch),
+        }));
+    }
+}
+
+describe('<arg2p-solver> saved and restored', function () {
+    it('should show the results of another theory, and the first ones again as they were, going on from there', async function () {
+        const first = new Printing([yes(), yes(), yes()]);
+        const { element, find } = await solver(first);
+        await element.run();
+        await find<HTMLElement & { next(): Promise<void> }>('arg2p-solutions').next();
+        await element.updateComplete;
+        const saved = element.save();
+        equal(saved.solutions.entries.length, 2);
+        element.restore(null);
+        await element.updateComplete;
+        equal(find('arg2p-solutions').shadowRoot!.textContent!.includes('Solution 1'), false);
+        equal(find<Arg2pGraph>('arg2p-graph').solution, null);
+        element.restore(saved);
+        await element.updateComplete;
+        const text = () => find('arg2p-solutions').shadowRoot!.textContent!;
+        ok(text().includes('Solution 1') && text().includes('Solution 2'));
+        equal(find<Arg2pGraph>('arg2p-graph').solution?.solution.result, 'yes');
+        equal(find('.console pre').textContent, 'printed++');
+        // the run goes on: the third solution
+        await find<HTMLElement & { next(): Promise<void> }>('arg2p-solutions').next();
+        await element.updateComplete;
+        ok(text().includes('Solution 3'));
+        equal(first.requests.length, 1, 'not run again');
+        equal(find('.console pre').textContent, 'printed+++', 'what the run prints goes on showing');
+    });
+
+    it('should stop a run under way when another one is shown', async function () {
+        const engine = new Fake([yes(), yes()]);
+        const { element } = await solver(engine);
+        await element.run();
+        engine.hold = true;
+        void element.shadowRoot!.querySelector<HTMLElement & { next(): Promise<void> }>('arg2p-solutions')!.next();
+        await element.updateComplete;
+        ok(element.busy);
+        element.restore(null);
+        equal(engine.stops, 1);
+        equal(element.busy, false);
+    });
+});

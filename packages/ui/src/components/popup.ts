@@ -28,6 +28,8 @@ export interface ArgumentShown extends Named {
     readonly builtOn: readonly Named[] | null;
     readonly attackedBy: readonly AttackShown[];
     readonly attacks: readonly AttackShown[];
+    /** The passages of a text its statement formalizes, when the page links them (see `passages`) */
+    readonly passages?: readonly string[];
 }
 
 /** The popup of [argument], placed next to its node by the canvas */
@@ -48,6 +50,9 @@ export function popup(argument: ArgumentShown) {
             ${argument.builtOn === null ? nothing : row('Built on', chips(argument.builtOn.map(named)))}
             ${row('Attacked by', chips(argument.attackedBy.map(attack)))}
             ${row('Attacks', chips(argument.attacks.map(attack)))}
+            ${argument.passages === undefined || argument.passages.length === 0
+                ? nothing
+                : row('From the text', html`${argument.passages.map(it => html`<blockquote class="passage">${it}</blockquote>`)}`)}
         </div>
     `;
 }
@@ -61,6 +66,13 @@ function chips(items: unknown[]) {
 }
 
 export const popupStyles = css`
+    .popup .passage {
+        margin: 2px 0 0 0;
+        padding: 2px 0 2px 8px;
+        border-left: 3px solid var(--_accent);
+        font-style: italic;
+        line-height: 1.4;
+    }
     .popup {
         position: absolute;
         z-index: 20;

@@ -64,6 +64,17 @@ ICCMA'23 files as theories, and exported to APX and TGF.
   <img src="docs/phone.png" width="200" alt="The drawing on a phone">
 </p>
 
+## Formalizing a text
+
+*Text*, next to the theory, shows a text in natural language above it: *Formalize* has a language model write it as
+a structured theory or an abstract framework (as picked), following the method of Arg2P (the skill `arg2p-formalize`),
+checks it with the solver, and solves it. Each statement of the theory is linked to the passages of the text it comes
+from: they share a colour, and the statement picked in the text, in the theory or in the graph stands out in all
+three. What the model chose (its glossary, the readings of the ambiguous passages, its notes) is told under the text.
+
+The model is one of [OpenRouter](https://openrouter.ai), `anthropic/claude-haiku-5.5` by default, with your own key (the
+gear button): it is kept in your browser alone, and sent to OpenRouter alone, which charges the requests to it.
+
 ## Parallel runs and the federation
 
 *Parallel*, a switch next to the tabs of the solver, runs the query on the parallel solver: on the Web Workers of the
@@ -88,7 +99,7 @@ A device runs the theories the others send it: pair only with devices you trust.
 
 ## Sharing a setup
 
-*Share* builds a link to the theory, query and flags shown: it packs them in a single compressed
+*Share* builds a link to the theory, query and flags shown (and the text they formalize, if any): it packs them in a single compressed
 `s` parameter, and the link opens them in a tab of their own, and runs them. Links can also be
 written by hand with the plain parameters below.
 

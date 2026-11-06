@@ -283,6 +283,18 @@ const layout = css`
     #theory {
         flex: 1;
     }
+    .theory.with-text arg2p-text {
+        flex: 0 0 var(--text);
+        min-height: 120px;
+    }
+    .text-divider {
+        margin: -6px 0;
+    }
+    .bar button.on {
+        color: var(--arg2p-accent);
+        border-color: var(--arg2p-accent);
+        background: color-mix(in srgb, var(--arg2p-accent) 12%, var(--arg2p-surface));
+    }
     arg2p-solver {
         min-width: 0;
         min-height: 0;
@@ -321,6 +333,13 @@ const layout = css`
         }
         #theory {
             height: 45vh;
+        }
+        .theory.with-text arg2p-text {
+            flex: none;
+            height: 45vh;
+        }
+        .text-divider {
+            display: none;
         }
         arg2p-solver {
             height: max(560px, 85dvh);

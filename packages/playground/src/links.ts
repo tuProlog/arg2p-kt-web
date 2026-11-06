@@ -2,11 +2,14 @@ import { toTheory, type Framework } from '@tuprolog/arg2p-ui/data';
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 import { fromBase64url, toBase64url } from './base64url.js';
 import { migratedContent, type Content } from './documents.js';
+import { readFormalization } from './formalize/formalizer.js';
 
 // Links to the playground as it is: the theory, query and flags of a document, packed into a single `s` parameter, a
 // JSON array deflated and base64url encoded. Its first item is the version of the format, so the layout can change
 // without breaking the links already shared.
 //
+//   version 3   [3, flags, theory, query, text, formalization]: a theory formalizing a text (see formalize/), the
+//               links of its statements to the text with it; a document with no text is still shared in version 2
 //   version 2   [2, flags, theory, query]
 //   version 1   [1, "structured", flags, theory, query] or [1, "abstract", flags, "a,b", "a-b,b-a"]
 //
@@ -64,6 +67,34 @@ const DICTIONARY_V2 = strToU8(
     ].join(''),
 );
 
+// Version 3 adds a text, and how the theory formalizes it
+const VERSION_3 = 3;
+const DICTIONARY_V3 = strToU8(
+    [
+        '[3,"',
+        'graphBuildMode(aspic_plus).\\n',
+        'graphBuildMode(abstract).\\n',
+        'arg2p::solve(In, Out, Und)',
+        '{"framework":"structured","links":[',
+        '{"framework":"abstract","links":[',
+        '{"statement":"',
+        '","quote":"',
+        '"glossary":[{"term":"',
+        '","meaning":"',
+        '"ledger":[{"point":"',
+        '","readings":"',
+        '","chosen":"',
+        '"notes":"',
+        '"model":"anthropic/claude-haiku-5.5","cost":',
+        ' :=> ',
+        ' => ',
+        ' -> ',
+        ' <-> ',
+        '(X)',
+        '\\n\\n',
+    ].join(''),
+);
+
 const ATOM = /^[a-z][a-zA-Z0-9_]*$/;
 
 /** What a link carries: the content of a document (what it states of it), and what was wrong with it */
@@ -97,8 +128,12 @@ export function shareUrl(content: Content, base: string): string {
     const url = new URL(base);
     url.search = '';
     url.hash = '';
-    const state = [VERSION, content.flags, content.theory, content.query];
-    url.searchParams.set(SHARED, toBase64url(deflateSync(strToU8(JSON.stringify(state)), { level: 9, dictionary: DICTIONARY_V2 })));
+    const formalized = (content.text ?? '').trim() !== '' || (content.formalization ?? null) !== null;
+    const state = formalized
+        ? [VERSION_3, content.flags, content.theory, content.query, content.text ?? '', content.formalization ?? null]
+        : [VERSION, content.flags, content.theory, content.query];
+    const dictionary = formalized ? DICTIONARY_V3 : DICTIONARY_V2;
+    url.searchParams.set(SHARED, toBase64url(deflateSync(strToU8(JSON.stringify(state)), { level: 9, dictionary })));
     return url.toString();
 }
 
@@ -110,7 +145,7 @@ function unpacked(packed: string, errors: string[]): Partial<Content> | null {
         errors.push('The shared state in the link is damaged and was ignored.');
         return null;
     }
-    for (const [version, dictionary] of [[VERSION, DICTIONARY_V2], [1, DICTIONARY_V1]] as const) {
+    for (const [version, dictionary] of [[VERSION_3, DICTIONARY_V3], [VERSION, DICTIONARY_V2], [1, DICTIONARY_V1]] as const) {
         let state: unknown;
         try {
             state = JSON.parse(strFromU8(inflateSync(bytes, { dictionary })));
@@ -118,6 +153,7 @@ function unpacked(packed: string, errors: string[]): Partial<Content> | null {
             continue;
         }
         if (!Array.isArray(state) || state[0] !== version) continue;
+        if (version === VERSION_3) return fromVersion3(state);
         return version === VERSION ? fromVersion2(state) : fromVersion1(state, errors);
     }
     // read with no dictionary, to tell a version this page does not know from a damaged link
@@ -141,6 +177,15 @@ function fromVersion2(state: unknown[]): Partial<Content> {
     if (typeof theory === 'string') content.theory = theory;
     if (typeof query === 'string') content.query = query;
     return content;
+}
+
+function fromVersion3(state: unknown[]): Partial<Content> {
+    const [, , , , text, formalization] = state;
+    return {
+        ...fromVersion2(state),
+        ...(typeof text === 'string' && text !== '' ? { text } : {}),
+        ...(readFormalization(formalization) !== null ? { formalization: readFormalization(formalization) } : {}),
+    };
 }
 
 function fromVersion1(state: unknown[], errors: string[]): Partial<Content> {

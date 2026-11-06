@@ -15,6 +15,15 @@ interface Entry {
     readonly accepted: number;
 }
 
+/** What the solutions show, to show again (see save and restore): the run, its solutions, the one shown, an error */
+export interface SolutionsState {
+    readonly run: Run | null;
+    readonly entries: readonly Entry[];
+    readonly error: EngineError | null;
+    /** The solution shown, by its place among the entries; -1 for none */
+    readonly shown: number;
+}
+
 /**
  * The solutions of a query, asked for one at a time (Next): yes with its bindings, no, or halt with its error; an
  * error that kept the query from running shows alone. Picking a yes solution shows it again (its graph, say).
@@ -61,6 +70,23 @@ export class Arg2pSolutions extends LitElement {
 
     clear(): void {
         this.reset();
+    }
+
+    /** What is shown now, to show it again with restore */
+    save(): SolutionsState {
+        return { run: this.run, entries: this.entries, error: this.error, shown: this.shown === null ? -1 : this.entries.indexOf(this.shown) };
+    }
+
+    /**
+     * Shows [state] again, as saved: its run goes on from where it was (a solution being computed meanwhile is let go,
+     * and no solution is told as shown: the page has it)
+     */
+    restore(state: SolutionsState): void {
+        this.reset();
+        this.run = state.run;
+        this.entries = [...state.entries];
+        this.error = state.error;
+        this.shown = this.entries[state.shown] ?? null;
     }
 
     /** Whether a solution is being computed */

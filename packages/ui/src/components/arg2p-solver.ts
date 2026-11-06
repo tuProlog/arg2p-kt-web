@@ -13,7 +13,7 @@ import type { Arg2pFramework } from './arg2p-framework.js';
 import './arg2p-graph.js';
 import type { Arg2pGraph } from './arg2p-graph.js';
 import './arg2p-solutions.js';
-import type { Arg2pSolutions } from './arg2p-solutions.js';
+import type { Arg2pSolutions, SolutionsState } from './arg2p-solutions.js';
 import { buttons, define } from './shared.js';
 
 /** The tabs of the solver itself; those of the page are named by the ids of their elements */
@@ -44,7 +44,12 @@ const QUERY = 'arg2p::solve(In, Out, Und)';
  * the Theory tab) as they are edited; `arg2p-run` {theory, query, flags} as a run starts; `arg2p-busy` {busy};
  * `arg2p-error` {error} with the EngineError of a run that could not start, or of a solution that could not be
  * computed (stopped, say); `arg2p-theory-error` {problem} with where the theory does not parse, without a Theory tab.
- * Those of the components inside come out too: `arg2p-solution`, `arg2p-positions`, `arg2p-toggle`, `arg2p-export`.
+ * Those of the components inside come out too: `arg2p-solution`, `arg2p-positions`, `arg2p-toggle`, `arg2p-export`,
+ * `arg2p-argument-select` (`arg2p-argument-hover` as one is hovered). The arguments of the statements `linked` are outlined
+ * in the graph and the drawing, and the `passages` of a text their statements formalize are shown in their popups.
+ *
+ * The solutions can be folded away, for the graph to take their room (`solutions-collapsed`; `arg2p-solutions-toggle`
+ * {collapsed} as the user folds or unfolds them).
  *
  * Slots: `actions`, at the end of the bar of the tabs (links, full screen, ...); `split`, between the solutions and
  * the graph (a handle that resizes them, setting --arg2p-solutions-width); `tab`, the tabs of the page: each element
@@ -52,6 +57,17 @@ const QUERY = 'arg2p::solve(In, Out, Und)';
  * The tab shown is `tab` (`results`, `flags`, `console`, `theory`, or the id of a tab of the page), and
  * `arg2p-tab-change` {tab} tells another one picked.
  */
+/** What a solver shows, saved to be shown again (see save and restore) */
+export interface SolverState {
+    readonly solutions: SolutionsState;
+    readonly solved: Solved | null;
+    readonly output: string;
+    /** The run the output comes from, which goes on printing there */
+    readonly printing: object | null;
+    readonly notice: string | null;
+    readonly positions: Positions | null;
+}
+
 export class Arg2pSolver extends LitElement {
     static override properties = {
         engine: { attribute: false },
@@ -60,6 +76,9 @@ export class Arg2pSolver extends LitElement {
         flags: {},
         fileName: { attribute: 'file-name' },
         theoryTab: { type: Boolean, attribute: 'theory-tab' },
+        linked: { attribute: false },
+        passages: { attribute: false },
+        solutionsCollapsed: { type: Boolean, attribute: 'solutions-collapsed', reflect: true },
         tab: {},
         hosted: { state: true },
         solved: { state: true },
@@ -80,6 +99,12 @@ export class Arg2pSolver extends LitElement {
     fileName = 'theory';
     /** Whether the theory is edited in a tab of its own */
     theoryTab = false;
+    /** The statements the page links to what it picked: their arguments are outlined in the graph and the drawing */
+    linked: readonly string[] = [];
+    /** The passages of a text each statement formalizes: shown in the popups of its arguments, in the graph and the drawing */
+    passages: Readonly<Record<string, readonly string[]>> = {};
+    /** Whether the solutions are folded away, beside the graph (unfolded on narrow screens, where they are above it) */
+    solutionsCollapsed = false;
     /** The tab shown: one of the solver (`results`, `flags`, `console`, `theory`), or the id of one of the page */
     tab: Panel | string = 'results';
 
@@ -98,6 +123,8 @@ export class Arg2pSolver extends LitElement {
     private told = false;
     // the runs started: what a run no longer the latest answers is let go
     private runs = 0;
+    // the run whose output is shown (it goes with its results, when they are saved and restored)
+    private printing: object | null = null;
     // the run whose first solution the drawing was fitted to, and whether an abstract framework was shown last
     private fitted = 0;
     private wasAbstract = false;
@@ -114,6 +141,8 @@ export class Arg2pSolver extends LitElement {
         this.reset();
         const run = this.runs;
         const request: SolveRequest = { theory: this.theory, query: this.query, flags: this.flags };
+        const printing = {};
+        this.printing = printing;
         this.select('results');
         this.starting = true;
         emit(this, 'arg2p-run', request);
@@ -122,7 +151,7 @@ export class Arg2pSolver extends LitElement {
         const solutions = this.find<Arg2pSolutions>('arg2p-solutions')!;
         try {
             const started = await engine.solve(request, text => {
-                if (run === this.runs) this.output += text;
+                if (printing === this.printing) this.output += text;
             });
             if (run !== this.runs) return;
             // busy all along: the first solution is asked for before the start is over
@@ -142,6 +171,40 @@ export class Arg2pSolver extends LitElement {
     /** Stops the run under way: what it was computing fails, as stopped */
     stop(): void {
         if (this.busy) this.engine?.stop();
+    }
+
+    /**
+     * What the solver shows now (its solutions, the one shown, what the run printed, where the arguments are), to show
+     * it again with restore: a page with several theories keeps the results of each
+     */
+    save(): SolverState {
+        return {
+            solutions: this.find<Arg2pSolutions>('arg2p-solutions')?.save() ?? { run: null, entries: [], error: null, shown: -1 },
+            solved: this.solved,
+            output: this.output,
+            printing: this.printing,
+            notice: this.notice,
+            positions: this.positions,
+        };
+    }
+
+    /**
+     * Shows [state] again, as saved, or nothing (null): a run under way is stopped first. Its run goes on from where it
+     * was, on the engine the solver has then.
+     */
+    restore(state: SolverState | null): void {
+        this.reset();
+        if (state === null) {
+            this.positions = null;
+            return;
+        }
+        this.find<Arg2pSolutions>('arg2p-solutions')?.restore(state.solutions);
+        this.solved = state.solved;
+        this.output = state.output;
+        this.printing = state.printing;
+        this.notice = state.notice;
+        this.positions = state.positions;
+        this.fitted = this.runs;
     }
 
     /** Forgets the results, and where the arguments were drawn (another theory is shown), stopping a run under way */
@@ -249,12 +312,19 @@ export class Arg2pSolver extends LitElement {
         this.computing = false;
         this.solved = null;
         this.output = '';
+        this.printing = null;
         this.notice = null;
         this.find<Arg2pSolutions>('arg2p-solutions')?.clear();
         if (running) this.engine?.stop();
     }
 
     // A solution shown: an abstract framework drawn first is fitted to what the solution derives too
+    // The solutions folded away, or back: the page is told, to keep it
+    private toggleSolutions(): void {
+        this.solutionsCollapsed = !this.solutionsCollapsed;
+        emit(this, 'arg2p-solutions-toggle', { collapsed: this.solutionsCollapsed });
+    }
+
     private show(solved: Solved): void {
         this.solved = solved;
         if (!this.abstract || this.fitted === this.runs) return;
@@ -350,20 +420,44 @@ export class Arg2pSolver extends LitElement {
                 : html`<div class="notice" part="notice" role="status">
                       <span>${this.notice}</span><button type="button" class="dismiss" title="Dismiss" aria-label="Dismiss" @click=${() => (this.notice = null)}>×</button>
                   </div>`}
-            <div class="panel results" part="results" role="tabpanel" id="panel-results" aria-labelledby="tab-results" ?hidden=${shown !== 'results'}>
+            <div
+                class="panel results ${this.solutionsCollapsed ? 'collapsed' : ''}"
+                part="results"
+                role="tabpanel"
+                id="panel-results"
+                aria-labelledby="tab-results"
+                ?hidden=${shown !== 'results'}
+            >
                 <arg2p-solutions
+                    id="solutions"
                     ?hide-exhausted-no=${abstract}
                     @arg2p-solution=${(e: CustomEvent<Solved>) => this.show(e.detail)}
                     @arg2p-busy=${own(({ busy }: { busy: boolean }) => (this.computing = busy))}
                     @arg2p-failure=${own(({ error }: { error: EngineError }) => this.failed(error))}
                     @arg2p-error-select=${own(({ error }: { error: EngineError }) => this.reveal(error))}
                 ></arg2p-solutions>
-                <div class="split"><slot name="split"></slot></div>
+                <div class="split">
+                    <button
+                        type="button"
+                        class="collapse"
+                        part="collapse"
+                        title=${this.solutionsCollapsed ? 'Show the solutions' : 'Hide the solutions, for a wider graph'}
+                        aria-label=${this.solutionsCollapsed ? 'Show the solutions' : 'Hide the solutions'}
+                        aria-expanded=${!this.solutionsCollapsed}
+                        aria-controls="solutions"
+                        @click=${() => this.toggleSolutions()}
+                    >
+                        <span aria-hidden="true">${this.solutionsCollapsed ? '›' : '‹'}</span>${this.solutionsCollapsed ? html`<span class="strip">Solutions</span>` : nothing}
+                    </button>
+                    <slot name="split"></slot>
+                </div>
                 <div class="view" part="view">
                     <arg2p-graph
                         ?hidden=${abstract}
                         file-name=${this.fileName}
                         .solution=${this.solved}
+                        .linked=${this.linked}
+                        .passages=${this.passages}
                         .positions=${this.positions}
                         @arg2p-positions=${(e: CustomEvent<{ positions: Positions }>) => (this.positions = e.detail.positions)}
                     ></arg2p-graph>
@@ -372,6 +466,8 @@ export class Arg2pSolver extends LitElement {
                         file-name=${this.fileName}
                         .theory=${this.theory}
                         .graph=${this.solved?.solution.graph ?? null}
+                        .linked=${this.linked}
+                        .passages=${this.passages}
                         .positions=${this.positions}
                         @arg2p-positions=${(e: CustomEvent<{ positions: Positions }>) => (this.positions = e.detail.positions)}
                         @arg2p-theory-change=${own(({ theory }: { theory: string }) => this.edit('theory', theory))}
@@ -543,8 +639,58 @@ export class Arg2pSolver extends LitElement {
                 min-height: 0;
             }
             .split {
+                position: relative;
                 display: flex;
                 min-width: 8px;
+            }
+            /* the handle that folds the solutions away, in the middle of the split, and the strip they fold into */
+            .collapse {
+                position: absolute;
+                z-index: 2;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 18px;
+                height: 28px;
+                padding: 0;
+                font: inherit;
+                font-size: 15px;
+                line-height: 1;
+                color: var(--_muted);
+                background: var(--_surface);
+                border: 1px solid var(--_border);
+                border-radius: 9px;
+                cursor: pointer;
+            }
+            .collapse:hover {
+                color: var(--_accent);
+                border-color: var(--_accent);
+            }
+            .results.collapsed {
+                grid-template-columns: auto minmax(240px, 1fr);
+            }
+            .results.collapsed arg2p-solutions,
+            .results.collapsed slot[name='split']::slotted(*) {
+                display: none;
+            }
+            .results.collapsed .collapse {
+                position: static;
+                transform: none;
+                flex-direction: column;
+                justify-content: flex-start;
+                gap: 8px;
+                width: 28px;
+                height: auto;
+                margin-right: 8px;
+                padding: 8px 0;
+                border-radius: 6px;
+            }
+            .strip {
+                writing-mode: vertical-rl;
+                font-size: 13px;
             }
             .view {
                 display: flex;
@@ -565,6 +711,9 @@ export class Arg2pSolver extends LitElement {
             .results:has(arg2p-graph[empty]:not([hidden])) .split,
             .results:has(arg2p-graph[empty]:not([hidden])) .view {
                 display: none;
+            }
+            .results:has(arg2p-graph[empty]:not([hidden])) arg2p-solutions {
+                display: block;
             }
             .theory {
                 display: flex;
@@ -602,11 +751,15 @@ export class Arg2pSolver extends LitElement {
                 .panel {
                     overflow: auto;
                 }
-                .results {
+                .results,
+                .results.collapsed {
                     grid-template-columns: 1fr;
                     grid-template-rows: none;
                     align-content: start;
                     gap: 8px;
+                }
+                .results.collapsed arg2p-solutions {
+                    display: block;
                 }
                 .split {
                     display: none;

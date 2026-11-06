@@ -44,7 +44,8 @@ const STYLE: StylesheetJson = [
  * (or tapping it) tells about it.
  *
  * Events: `arg2p-theory-change` with the theory, after every change made by drawing; `arg2p-positions` with where the
- * arguments are, as they are laid out or dragged; `arg2p-export` with the picture of the framework, as for the graph.
+ * arguments are, as they are laid out or dragged; `arg2p-export` with the picture of the framework, as for the graph;
+ * `arg2p-argument-select` {id, statement} with the argument tapped while selecting (its name, both), as for the graph.
  */
 export class Arg2pFramework extends CanvasElement {
     static override properties = {
@@ -52,6 +53,8 @@ export class Arg2pFramework extends CanvasElement {
         graph: { attribute: false },
         positions: { attribute: false },
         readonly: { type: Boolean, reflect: true },
+        linked: { attribute: false },
+        passages: { attribute: false },
         fileName: { attribute: 'file-name' },
         mode: { state: true },
         selected: { state: true },
@@ -66,6 +69,10 @@ export class Arg2pFramework extends CanvasElement {
     /** Where the arguments are, by name, as the graph of the framework has them (see arg2p-positions) */
     positions: Positions | null = null;
     readonly = false;
+    /** The arguments the page links to what it picked: they are outlined */
+    linked: readonly string[] = [];
+    /** The passages of a text each argument formalizes: shown in its popup */
+    passages: Readonly<Record<string, readonly string[]>> = {};
     /** The name of the picture the framework is saved as, with no extension */
     fileName = 'framework';
 
@@ -106,6 +113,11 @@ export class Arg2pFramework extends CanvasElement {
     protected override updated(changed: PropertyValues): void {
         if (changed.has('positions')) this.canvas.give(this.positions);
         if (changed.has('theory') || changed.has('graph')) this.draw();
+        // the arguments linked change as the page hovers what they come from: outlined, and nothing else redrawn
+        else if (changed.has('linked')) {
+            const linked = new Set(this.linked);
+            this.canvas.mark('linked', name => linked.has(name));
+        }
         if (changed.has('renaming') && this.renaming !== null && changed.get('renaming') === null) {
             const box = this.renderRoot.querySelector<HTMLInputElement>('.rename');
             this.placeRename();
@@ -135,10 +147,11 @@ export class Arg2pFramework extends CanvasElement {
     // or around the others
     private draw(): void {
         const tone = (name: string) => this.labels.get(name) ?? 'na';
+        const linked = new Set(this.linked);
         const nodes: Drawn[] = this.drawnArguments.map(({ it, derived }) => ({
             group: 'nodes',
-            data: { id: it, name: it, text: it, tone: tone(it), ...nodeSize(it) },
-            classes: [derived ? 'derived' : '', it === this.source ? 'source' : ''].join(' ').trim(),
+            data: { id: it, name: it, statement: it, text: it, tone: tone(it), ...nodeSize(it) },
+            classes: [derived ? 'derived' : '', it === this.source ? 'source' : '', linked.has(it) ? 'linked' : ''].join(' ').trim(),
         }));
         const edges: Drawn[] = this.drawnAttacks.map(({ it, derived }) => ({
             group: 'edges',
@@ -344,6 +357,7 @@ export class Arg2pFramework extends CanvasElement {
             builtOn: null,
             attackedBy: this.drawnAttacks.filter(({ it }) => it.to === name).map(({ it }) => attack(it.from)),
             attacks: this.drawnAttacks.filter(({ it }) => it.from === name).map(({ it }) => attack(it.to)),
+            passages: this.passages[name] ?? [],
         });
     }
 

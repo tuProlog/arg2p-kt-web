@@ -3,7 +3,7 @@ import { bracketMatching } from '@codemirror/language';
 import { linter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, Prec, type Extension, type Text } from '@codemirror/state';
-import { EditorView, drawSelection, keymap, lineNumbers, placeholder } from '@codemirror/view';
+import { Decoration, EditorView, drawSelection, keymap, lineNumbers, placeholder } from '@codemirror/view';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { arg2p } from '../editor/language.js';
 import { keepView, rangeOf } from '../editor/view.js';
@@ -15,14 +15,34 @@ import { activate, define } from './shared.js';
 // How long the typing is let be before the text is checked
 const CHECK_DELAY = 500;
 
-export type EditorKind = 'theory' | 'query' | 'flags';
+export type EditorKind = 'theory' | 'query' | 'flags' | 'text';
+
+/** How many tones marks come in (see EditorMark) */
+export const MARK_TONES = 8;
 
 /**
- * An editor of a theory, a query or flags, in the language of arg2p. The engine checks the text once the typing
- * settles: a syntax error is underlined (its message shows when hovering it), and written under the editor, which
- * takes to it when tapped (touch screens have no hover). A query is one line: Enter submits it.
+ * A stretch of the text marked by the page: what it links to something else (the passage of a text a rule formalizes,
+ * say). Marks of the same [tone] (0 to MARK_TONES - 1) share a colour; the [active] ones stand out. [key] is what the
+ * page knows it by, told back when the mark is picked.
+ */
+export interface EditorMark {
+    readonly key: string;
+    readonly from: number;
+    readonly to: number;
+    readonly tone: number;
+    readonly active?: boolean;
+    readonly title?: string;
+}
+
+/**
+ * An editor of a theory, a query or flags, in the language of arg2p, or of a plain text (kind `text`). The engine
+ * checks a theory or a query once the typing settles: a syntax error is underlined (its message shows when hovering
+ * it), and written under the editor, which takes to it when tapped (touch screens have no hover). A query is one line:
+ * Enter submits it. The page may mark stretches of the text (see EditorMark).
  *
- * Events: `arg2p-change` with the text, as it is typed; `arg2p-submit` when Enter is pressed in a query.
+ * Events: `arg2p-change` with the text, as it is typed; `arg2p-submit` when Enter is pressed in a query;
+ * `arg2p-mark-select` {key} when the cursor goes into a mark (a click, the keys), {key: null} when it leaves them;
+ * `arg2p-mark-hover` {key} when the pointer goes over a mark, {key: null} when it leaves them.
  */
 export class Arg2pEditor extends LitElement {
     static override properties = {
@@ -32,6 +52,7 @@ export class Arg2pEditor extends LitElement {
         label: {},
         placeholder: {},
         readonly: { type: Boolean, reflect: true },
+        marks: { attribute: false },
         problem: { state: true },
     };
 
@@ -44,6 +65,8 @@ export class Arg2pEditor extends LitElement {
     label = '';
     placeholder = '';
     readonly = false;
+    /** The stretches of the text the page marks */
+    marks: readonly EditorMark[] = [];
 
     // the syntax error shown, if any, and how many were reported (a check started before one does not hide it)
     private problem: SyntaxProblem | null = null;
@@ -55,6 +78,11 @@ export class Arg2pEditor extends LitElement {
     private readonly editable = new Compartment();
     private readonly hint = new Compartment();
     private readonly checking = new Compartment();
+    private readonly marking = new Compartment();
+    // the mark the cursor is in, as last told
+    private markIn: string | null = null;
+    // the mark the pointer is over
+    private markOver: string | null = null;
 
     /** Shows [problem] (found by running, say) at once, and takes the editor to it */
     report(problem: SyntaxProblem): void {
@@ -73,6 +101,14 @@ export class Arg2pEditor extends LitElement {
         const { from } = rangeOf(view.state.doc, { line, column, length: 0 });
         view.dispatch({ selection: { anchor: from }, effects: EditorView.scrollIntoView(from, { y: 'center' }) });
         view.focus();
+    }
+
+    /** Brings the mark [key] into view, without moving the cursor or the focus */
+    showMark(key: string): void {
+        const view = this.view;
+        const mark = this.marks.find(it => it.key === key);
+        if (view === null || mark === undefined) return;
+        view.dispatch({ effects: EditorView.scrollIntoView(Math.min(mark.from, view.state.doc.length), { y: 'nearest', yMargin: 24 }) });
     }
 
     override focus(): void {
@@ -100,6 +136,7 @@ export class Arg2pEditor extends LitElement {
             changed.has('readonly') ? this.editable.reconfigure(EditorState.readOnly.of(this.readonly)) : null,
             changed.has('placeholder') ? this.hint.reconfigure(placeholder(this.placeholder)) : null,
             changed.has('engine') || changed.has('kind') ? this.checking.reconfigure(this.check()) : null,
+            changed.has('marks') || changed.has('value') ? this.marking.reconfigure(this.marked()) : null,
         ].filter(it => it !== null);
         if (effects.length > 0) view.dispatch({ effects });
     }
@@ -118,7 +155,6 @@ export class Arg2pEditor extends LitElement {
 
     private extensions(): Extension[] {
         return [
-            arg2p(),
             history(),
             drawSelection(),
             bracketMatching(),
@@ -129,7 +165,16 @@ export class Arg2pEditor extends LitElement {
             this.editable.of(EditorState.readOnly.of(this.readonly)),
             this.hint.of(placeholder(this.placeholder)),
             this.checking.of(this.check()),
+            this.marking.of(this.marked()),
+            EditorView.domEventHandlers({
+                mousemove: (event, view) => {
+                    const at = view.posAtCoords({ x: event.clientX, y: event.clientY });
+                    this.hover(at === null ? null : this.markAt(at));
+                },
+                mouseleave: () => this.hover(null),
+            }),
             EditorView.updateListener.of(update => {
+                if (update.selectionSet && !update.docChanged) this.followCursor(update.state.selection.main.head);
                 if (!update.docChanged) return;
                 const value = update.state.doc.toString();
                 if (value === this.value) return;
@@ -149,14 +194,58 @@ export class Arg2pEditor extends LitElement {
                 },
                 '.cm-placeholder': { color: 'var(--_muted)' },
                 '.cm-tooltip': { backgroundColor: 'var(--_surface)', color: 'var(--_text)', border: '1px solid var(--_border)' },
+                // the marks of the page: a tint of their tone, the active ones stronger and underlined
+                '.cm-arg2p-mark': { backgroundColor: 'color-mix(in srgb, var(--_mark) 18%, transparent)', borderRadius: '2px', cursor: 'pointer' },
+                '.cm-arg2p-mark-active': { backgroundColor: 'color-mix(in srgb, var(--_mark) 38%, transparent)', boxShadow: 'inset 0 -2px 0 var(--_mark)' },
             }),
         ];
     }
 
-    // A query is one line: Enter submits it, and a text pasted in is joined on one line; the others have lines
+    // The marks of the page as decorations: in order, and held within the text (a page may give marks of a text that
+    // changed since)
+    private marked(): Extension {
+        const length = this.view?.state.doc.length ?? this.value.length;
+        const ranges = this.marks
+            .map(it => ({ ...it, from: Math.max(0, Math.min(it.from, length)), to: Math.max(0, Math.min(it.to, length)) }))
+            .filter(it => it.to > it.from)
+            .sort((a, b) => a.from - b.from || a.to - b.to)
+            .map(it =>
+                Decoration.mark({
+                    class: it.active ? 'cm-arg2p-mark cm-arg2p-mark-active' : 'cm-arg2p-mark',
+                    attributes: { style: `--_mark: var(--_tone-${((it.tone % MARK_TONES) + MARK_TONES) % MARK_TONES})`, ...(it.title ? { title: it.title } : {}) },
+                }).range(it.from, it.to),
+            );
+        return EditorView.decorations.of(Decoration.set(ranges));
+    }
+
+    // The mark the cursor is in, told when it changes (the innermost one, the shortest, when marks overlap)
+    private followCursor(at: number): void {
+        const key = this.markAt(at);
+        if (key === this.markIn) return;
+        this.markIn = key;
+        emit(this, 'arg2p-mark-select', { key });
+    }
+
+    // The mark the pointer is over, told when it changes
+    private hover(key: string | null): void {
+        if (key === this.markOver) return;
+        this.markOver = key;
+        emit(this, 'arg2p-mark-hover', { key });
+    }
+
+    // The key of the mark at [at] (the innermost one, the shortest, when marks overlap), or null
+    private markAt(at: number): string | null {
+        const inside = this.marks.filter(it => it.from <= at && at <= it.to && it.to > it.from).sort((a, b) => a.to - a.from - (b.to - b.from));
+        return inside[0]?.key ?? null;
+    }
+
+    // A query is one line: Enter submits it, and a text pasted in is joined on one line; the others have lines, in the
+    // language of arg2p but for a plain text, whose lines are not numbered
     private shaped(): Extension {
-        if (this.kind !== 'query') return [lineNumbers(), EditorView.lineWrapping];
+        if (this.kind === 'text') return [EditorView.lineWrapping];
+        if (this.kind !== 'query') return [arg2p(), lineNumbers(), EditorView.lineWrapping];
         return [
+            arg2p(),
             Prec.highest(keymap.of([{ key: 'Enter', run: () => (emit(this, 'arg2p-submit', { value: this.value }), true) }])),
             EditorState.transactionFilter.of(tr => (tr.newDoc.lines > 1 ? [tr, { changes: { from: 0, to: tr.newDoc.length, insert: tr.newDoc.toString().replace(/\s*\n\s*/g, ' ') }, sequential: true }] : tr)),
         ];
@@ -172,7 +261,7 @@ export class Arg2pEditor extends LitElement {
     // changes)
     private check(): Extension {
         const engine = this.engine;
-        if (engine === null) return [];
+        if (engine === null || this.kind === 'text') return [];
         const kind = this.kind === 'query' ? 'query' : 'theory';
         return linter(
             async view => {
