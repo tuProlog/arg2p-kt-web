@@ -3,7 +3,7 @@ import { css, html, nothing, type PropertyValues } from 'lit';
 import { EMPTY_GRAPH, type ArgumentData, type GraphData, type Solved } from '../engine.js';
 import { emit } from '../events.js';
 import { Canvas, nodeSize, type Drawn } from '../graph/canvas.js';
-import { attackId, attacksAround, curveOf, isAbstract, kindOf, nameOf, nodeLabel } from '../graph/drawing.js';
+import { attackId, attacksAround, curveOf, isAbstract, isLinked, kindOf, nameOf, nodeLabel, passagesOf, statementOf } from '../graph/drawing.js';
 import { layeredLayout, type Link } from '../graph/layout.js';
 import { levelsOf, supportsOf } from '../graph/levels.js';
 import type { Positions } from '../graph/positions.js';
@@ -40,7 +40,9 @@ const STYLE: StylesheetJson = [
  *
  * Events: `arg2p-toggle` when supports or conclusions are shown or hidden (to remember it); `arg2p-positions` with
  * where the arguments of an abstract framework are, as they are laid out or dragged; `arg2p-export` with the picture
- * (cancel it to save the picture another way; otherwise it is downloaded).
+ * (cancel it to save the picture another way; otherwise it is downloaded); `arg2p-argument-select` {id, statement}
+ * with the argument tapped and the statement of the theory it comes from (see statementOf), {id: null, statement:
+ * null} when a tap is off the arguments.
  */
 export class Arg2pGraph extends CanvasElement {
     static override properties = {
@@ -48,6 +50,8 @@ export class Arg2pGraph extends CanvasElement {
         positions: { attribute: false },
         showSupports: { type: Boolean, attribute: 'show-supports', reflect: true },
         showConclusions: { type: Boolean, attribute: 'show-conclusions', reflect: true },
+        linked: { attribute: false },
+        passages: { attribute: false },
         fileName: { attribute: 'file-name' },
         stage: { state: true },
         drawn: { state: true },
@@ -59,6 +63,13 @@ export class Arg2pGraph extends CanvasElement {
     positions: Positions | null = null;
     showSupports = true;
     showConclusions = false;
+    /**
+     * The statements of the theory (rule names, premise names, abstract arguments) the page links to what it picked:
+     * the arguments they build are outlined. A transposed rule (`r1_i`) counts as the rule it comes from.
+     */
+    linked: readonly string[] = [];
+    /** The passages of a text each statement formalizes: shown in the popups of its arguments */
+    passages: Readonly<Record<string, readonly string[]>> = {};
     /** The name of the picture the graph is saved as, with no extension */
     fileName = 'graph';
 
@@ -98,6 +109,11 @@ export class Arg2pGraph extends CanvasElement {
     protected override updated(changed: PropertyValues): void {
         if (changed.has('positions')) this.canvas.give(this.positions);
         if (changed.has('drawn') || changed.has('showSupports') || changed.has('showConclusions')) this.draw();
+        // the arguments linked change as the page hovers what they come from: outlined, and nothing else redrawn
+        else if (changed.has('linked')) {
+            const linked = new Set(this.linked);
+            this.canvas.mark('linked', statement => isLinked(statement, linked));
+        }
     }
 
     private draw(): void {
@@ -105,9 +121,15 @@ export class Arg2pGraph extends CanvasElement {
         const abstract = isAbstract(graph);
         const labels = new Map(graph.arguments.map(it => [it.id, it.label]));
         const supports = abstract ? [] : supportsOf(graph.arguments);
+        const linked = new Set(this.linked);
         const nodes: Drawn[] = graph.arguments.map(it => {
             const text = nodeLabel(it, abstract, this.showConclusions);
-            return { group: 'nodes', data: { id: it.id, name: nameOf(it, abstract), text, tone: it.label, ...nodeSize(text) }, classes: '' };
+            const statement = statementOf(it, abstract);
+            return {
+                group: 'nodes',
+                data: { id: it.id, name: nameOf(it, abstract), statement, text, tone: it.label, ...nodeSize(text) },
+                classes: isLinked(statement, linked) ? 'linked' : '',
+            };
         });
         const edges: Drawn[] = [
             ...graph.attacks.map(it => ({
@@ -245,6 +267,7 @@ export class Arg2pGraph extends CanvasElement {
             builtOn: abstract ? null : argument.supports.map(named),
             attackedBy: by.map(it => attack(it.from, it.type, it.to, it.on)),
             attacks: on.map(it => attack(it.to, it.type, it.to, it.on)),
+            passages: passagesOf(this.passages, statementOf(argument, abstract)),
         };
         return popup(shown);
     }

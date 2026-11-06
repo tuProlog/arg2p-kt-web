@@ -40,6 +40,9 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | `flags: string` | `flags` | The flags, as Prolog facts |
 | `fileName: string` | `file-name` | The name the pictures of the graph and the drawing are saved as (`theory`) |
 | `theoryTab: boolean` | `theory-tab` | The theory edited in a tab of its own, for a page without an editor of its own |
+| `linked: string[]` | | Statements of the theory (rule and premise names, abstract arguments) a page links to what it picked: their arguments are outlined in the graph and the drawing (a transposed rule, `r1_i`, counts as `r1`) |
+| `passages: Record<string, string[]>` | | The passages of a text each statement formalizes, by statement: shown in the popups of its arguments, in the graph and the drawing |
+| `solutionsCollapsed: boolean` | `solutions-collapsed` | The solutions folded away, for the graph to take their room (the user folds them with the handle of the split: `arg2p-solutions-toggle` `{ collapsed }`) |
 | `tab: string` | `tab` | The tab shown: `results` (the default), `flags`, `console`, `theory`, or the `id` of a tab of the page |
 | `busy: boolean` (read only) | `busy` (set by the solver) | A run is being started, or a solution computed |
 
@@ -63,6 +66,8 @@ an engine, the theory, the query and the flags, and a height (that of a webview,
 | `arg2p-error` | `{ error: EngineError }` | A run could not start, or a solution could not be computed (`error.stopped` when stopped) |
 | `arg2p-theory-error` | `{ problem: SyntaxProblem }` | Where the theory does not parse, without a Theory tab: the page has the theory |
 | `arg2p-solution` | `{ solution, run }` | A solution shown (`Solved`), from the solutions inside |
+| `arg2p-argument-select` | `{ id, statement }` | An argument tapped in the graph or the drawing, and the statement of the theory it comes from (both null off the arguments) |
+| `arg2p-argument-hover` | `{ id, statement }` | An argument hovered in the graph or the drawing, and its statement (both null once left) |
 | `arg2p-positions`, `arg2p-toggle`, `arg2p-export` | | From the graph and the drawing inside (see below) |
 
 | Slot | |
@@ -133,9 +138,9 @@ The solver is made of components that can be used apart:
 
 | | |
 | --- | --- |
-| Properties | `value`, `kind` (`theory`, `query`, `flags`), `engine` (checks the text), `label` (its name, for the messages and readers of the screen), `placeholder`, `readonly` |
-| Methods | `report(problem)` shows a problem found by running and goes there; `reveal(line, column)`; `focus()` |
-| Events | `arg2p-change` `{ value }` as it is typed; `arg2p-submit` `{ value }` on Enter in a query |
+| Properties | `value`, `kind` (`theory`, `query`, `flags`, or `text`: a plain text, unchecked), `engine` (checks the text), `label` (its name, for the messages and readers of the screen), `placeholder`, `readonly`, `marks` (stretches of the text the page marks, `EditorMark`: `{ key, from, to, tone, active?, title? }`, in `MARK_TONES` tones) |
+| Methods | `report(problem)` shows a problem found by running and goes there; `reveal(line, column)`; `showMark(key)` brings a mark into view; `focus()` |
+| Events | `arg2p-change` `{ value }` as it is typed; `arg2p-submit` `{ value }` on Enter in a query; `arg2p-mark-select` `{ key }` as the cursor goes into a mark (`key: null` out of them); `arg2p-mark-hover` `{ key }` as the pointer goes over one (`key: null` off them) |
 
 ### `<arg2p-solutions>`
 
@@ -149,17 +154,17 @@ The solver is made of components that can be used apart:
 
 | | |
 | --- | --- |
-| Properties | `solution` (a `Solved`: the solution and its run, to browse its stages; null for none), `positions`, `showSupports` (`show-supports`), `showConclusions` (`show-conclusions`), `fileName` (`file-name`); read only: `empty` (attribute too: nothing to show) |
+| Properties | `solution` (a `Solved`: the solution and its run, to browse its stages; null for none), `positions`, `showSupports` (`show-supports`), `showConclusions` (`show-conclusions`), `linked` (statements of the theory: the arguments they build are outlined), `passages` (the passages of a text each statement formalizes: shown in the popups), `fileName` (`file-name`); read only: `empty` (attribute too: nothing to show) |
 | Methods | `png()`, `fit()`, `restyle()` |
-| Events | `arg2p-toggle` `{ showSupports, showConclusions }`; `arg2p-positions` `{ positions }`; `arg2p-export` `{ fileName, dataUrl }`, cancelable to save the picture another way |
+| Events | `arg2p-toggle` `{ showSupports, showConclusions }`; `arg2p-positions` `{ positions }`; `arg2p-export` `{ fileName, dataUrl }`, cancelable to save the picture another way; `arg2p-argument-select` `{ id, statement }` with the argument tapped and the statement it comes from (`statementOf`), both null off the arguments; `arg2p-argument-hover` `{ id, statement }` likewise with the argument hovered |
 
 ### `<arg2p-framework>`
 
 | | |
 | --- | --- |
-| Properties | `theory`, `graph` (of a solution of the theory: its labels, and what it derives), `positions`, `readonly`, `fileName` (`file-name`) |
+| Properties | `theory`, `graph` (of a solution of the theory: its labels, and what it derives), `positions`, `readonly`, `linked` (arguments outlined), `passages` (by argument, shown in the popups), `fileName` (`file-name`) |
 | Methods | `png()`, `fit()`, `restyle()` |
-| Events | `arg2p-theory-change` `{ theory }` after a change made by drawing; `arg2p-positions` `{ positions }`; `arg2p-export` |
+| Events | `arg2p-theory-change` `{ theory }` after a change made by drawing; `arg2p-positions` `{ positions }`; `arg2p-export`; `arg2p-argument-select` `{ id, statement }` while selecting; `arg2p-argument-hover` `{ id, statement }` |
 
 ### `<arg2p-flags>`
 
@@ -224,6 +229,7 @@ a light theme otherwise:
 | `--arg2p-in`, `--arg2p-out`, `--arg2p-und`, `--arg2p-unlabelled` | The labels of the arguments (the same in every theme: they carry meaning, and white is written on them) |
 | `--arg2p-support` | The supports between arguments |
 | `--arg2p-atom`, `--arg2p-functor`, `--arg2p-variable`, `--arg2p-comment` | The highlighting of the editors |
+| `--arg2p-tone-0` … `--arg2p-tone-7` | The tones of the marks of the editors (what a page links), shown as tints |
 | `--arg2p-font`, `--arg2p-mono` | The fonts, of the text and of the code |
 
 What is written on the accent and on the error (a badge, the Run button) takes the colour of the surface: the accent

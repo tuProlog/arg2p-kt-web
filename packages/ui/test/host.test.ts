@@ -207,6 +207,19 @@ describe('Engine of the browser', function () {
         equal(run.hasNext(), false);
     });
 
+    it('should end its worker when disposed, failing what was waited for, and start a fresh one when asked again', async function () {
+        const channels: Channel[] = [];
+        const solving = engine(channels);
+        const run = await solving.solve({ theory: TWEETY, query: 'buildLabelSets', flags: FLAGS });
+        const pending = run.next();
+        solving.dispose();
+        ok((await failure(pending)) !== null);
+        equal(run.hasNext(), false);
+        equal(channels.length, 1, 'no fresh worker until asked');
+        await solving.check('a.', 'theory');
+        equal(channels.length, 2);
+    });
+
     it('should ask the checks and the settings again of the worker it starts as it stops, failing the query alone', async function () {
         const channels: Channel[] = [];
         const solving = engine(channels);

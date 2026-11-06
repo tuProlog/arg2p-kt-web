@@ -49,6 +49,8 @@ const STYLE: StylesheetJson = [
         },
     },
     { selector: 'node:selected', style: { 'border-width': 3, 'border-color': 'data(outline)' } },
+    // the arguments a page links to what it picked (see the property linked of the components)
+    { selector: 'node.linked', style: { 'border-width': 4, 'border-style': 'double', 'border-color': 'data(outline)', 'overlay-opacity': 0.12, 'overlay-color': 'data(outline)', 'overlay-padding': 6 } },
     {
         selector: 'edge',
         style: {
@@ -239,6 +241,13 @@ export class Canvas implements ReactiveController {
         if (this.shownId !== null && cy.getElementById(this.shownId).empty()) this.shownId = this.pinned = null;
     }
 
+    /** Gives the class [name] to the arguments whose statement [test] picks, and takes it from the others: nothing else changes */
+    mark(name: string, test: (statement: string) => boolean): void {
+        const cy = this.core;
+        if (cy === null) return;
+        cy.batch(() => cy.nodes().forEach(it => void it.toggleClass(name, test((it.data('statement') as string | undefined) ?? ''))));
+    }
+
     /** Adds [element] at [position], ahead of drawing it (an argument drawn goes where it was asked for) */
     add(element: Drawn, position: { x: number; y: number }): void {
         this.core?.add({ group: element.group, data: { ...element.data, ...this.palette()(element.data.tone) }, classes: element.classes, position: { ...position } });
@@ -287,13 +296,23 @@ export class Canvas implements ReactiveController {
     private create(): void {
         const container = this.host.renderRoot.querySelector<HTMLElement>('.canvas')!;
         const cy = drawing(container, [...STYLE, ...this.options.style, MUTUAL_STYLE]);
-        cy.on('mouseover', 'node', (event: EventObject) => this.show(event.target.id()));
-        cy.on('mouseout', 'node', () => this.show(this.pinned));
-        // a tap is the only way to show the popup on touch screens
+        // the page is told the argument hovered, and its statement, as it is when one is tapped (arg2p-argument-hover)
+        cy.on('mouseover', 'node', (event: EventObject) => {
+            this.show(event.target.id());
+            emit(this.host, 'arg2p-argument-hover', { id: event.target.id() as string, statement: (event.target.data('statement') as string | undefined) ?? null });
+        });
+        cy.on('mouseout', 'node', () => {
+            this.show(this.pinned);
+            emit(this.host, 'arg2p-argument-hover', { id: null, statement: null });
+        });
+        // a tap is the only way to show the popup on touch screens; it picks the argument too (or none, off them): the
+        // page is told which, and the statement of the theory it comes from (arg2p-argument-select)
         cy.on('tap', (event: EventObject) => {
             if (!(this.options.pins?.() ?? true)) return;
-            this.pinned = event.target !== cy && event.target.isNode() ? (event.target.id() as string) : null;
+            const node = event.target !== cy && event.target.isNode() ? event.target : null;
+            this.pinned = node === null ? null : (node.id() as string);
             this.show(this.pinned);
+            emit(this.host, 'arg2p-argument-select', { id: this.pinned, statement: node === null ? null : ((node.data('statement') as string | undefined) ?? null) });
         });
         // the popup follows its node while the drawing is dragged or zoomed
         cy.on('viewport position', () => this.placePopup());

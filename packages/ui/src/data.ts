@@ -26,4 +26,6 @@ export type { Positions } from './graph/positions.js';
 export { layeredLayout, type Link, type Point, type Size, type LayoutOptions } from './graph/layout.js';
 export { levelsOf, supportsOf } from './graph/levels.js';
 export { isAbstract, nameOf } from './graph/drawing.js';
+// What links an argument to the statement of the theory it comes from (a page links statements to what they are about)
+export { statementOf, sourceStatement, isLinked, passagesOf } from './graph/drawing.js';
 export { redrawn } from './formats/declarations.js';

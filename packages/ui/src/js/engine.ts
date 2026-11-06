@@ -99,6 +99,14 @@ export class JsEngine implements Engine {
         );
     }
 
+    /** Ends the worker: what was waited for fails, and the next request starts a fresh one */
+    dispose(): void {
+        this.fail(GONE);
+        this.current = 0;
+        this.channel?.terminate();
+        this.channel = null;
+    }
+
     stop(): void {
         // nothing is being evaluated: the worker is let be
         if (![...this.pending.keys()].some(isRun)) return;
