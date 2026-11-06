@@ -78,7 +78,7 @@ export class Session {
     edit(content: Partial<Content>): void {
         const doc = this.activeDocument;
         if (doc === null) return;
-        this.pending = { theory: doc.theory, query: doc.query, flags: doc.flags, ...this.pending, ...content };
+        this.pending = { ...store.contentOf(doc), ...this.pending, ...content };
         clearTimeout(this.timer);
         this.timer = setTimeout(() => this.flush(), AUTOSAVE_DELAY);
     }
@@ -87,7 +87,7 @@ export class Session {
     content(): Content | null {
         const doc = this.activeDocument;
         if (doc === null) return null;
-        return { theory: doc.theory, query: doc.query, flags: doc.flags, ...this.pending };
+        return { ...store.contentOf(doc), ...this.pending };
     }
 
     select(id: string): void {

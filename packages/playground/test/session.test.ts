@@ -53,6 +53,21 @@ describe('Session', function () {
         deepEqual(second.current.tabs.map(it => it.name), ['Start', 'Second']);
     });
 
+    it('should keep the text of a document, and how its theory formalizes it, with its edits', function () {
+        const { session: editing, storage } = session();
+        const formalization = { framework: 'structured' as const, links: [{ statement: 'r1', quote: 'Birds fly' }], glossary: [], ledger: [], notes: '', model: 'm', cost: null };
+        editing.restore(() => ({ ...store.blank(), text: 'Birds fly.', formalization }), 'Mine');
+        editing.edit({ theory: 'r1 : bird(X) => flies(X).' });
+        deepEqual(editing.content()!.formalization, formalization);
+        editing.edit({ text: 'Birds fly, mostly.' });
+        editing.flush();
+        const { session: second, shown } = session(storage);
+        second.restore(() => store.blank(), 'Ignored');
+        equal(shown.at(-1)!.text, 'Birds fly, mostly.');
+        equal(shown.at(-1)!.theory, 'r1 : bird(X) => flies(X).');
+        deepEqual(shown.at(-1)!.formalization, formalization);
+    });
+
     it('should save the edits once they settle', function () {
         const { session: editing, storage } = session();
         editing.restore(() => store.blank(), 'Mine');

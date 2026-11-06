@@ -1,4 +1,5 @@
 import { DEFAULT_FLAGS, profileOf as profileOfTexts, toTheory, type Framework } from '@tuprolog/arg2p-ui/data';
+import type { Formalization } from './formalize/formalizer.js';
 
 // The working memory of the playground, like the tabs of a text editor: every theory worked on is a document (its
 // theory, query and flags), kept in the browser and restored on the next visit. Closed documents are kept for a while
@@ -29,6 +30,10 @@ export interface Content {
     readonly theory: string;
     readonly query: string;
     readonly flags: string;
+    /** The text in natural language the theory formalizes, if any (see formalize/) */
+    readonly text?: string;
+    /** How the theory formalizes the text: the passage of each statement, the glossary, the readings chosen */
+    readonly formalization?: Formalization | null;
 }
 
 export interface Doc extends Content {
@@ -126,7 +131,7 @@ export function newId(now = Date.now()): string {
 /** [workspace] with a new document after the active one, active */
 export function create(workspace: Workspace, content: Content, name?: string | null, now = Date.now()): Workspace {
     const id = newId(now);
-    const doc: Doc = { theory: content.theory, query: content.query, flags: content.flags, id, name: freeName(workspace, name), updated: now };
+    const doc: Doc = { ...contentOf(content), id, name: freeName(workspace, name), updated: now };
     const at = workspace.tabs.findIndex(it => it.id === workspace.active);
     const tabs = workspace.tabs.slice();
     tabs.splice(at === -1 ? tabs.length : at + 1, 0, doc);
@@ -191,9 +196,20 @@ export function clearClosed(workspace: Workspace): Workspace {
     return { ...workspace, closed: [] };
 }
 
-/** Whether [doc] has nothing worth keeping once closed: no theory */
+/** Whether [doc] has nothing worth keeping once closed: no theory, and no text */
 export function isBlank(doc: Content): boolean {
-    return doc.theory.trim() === '';
+    return doc.theory.trim() === '' && (doc.text ?? '').trim() === '';
+}
+
+/** The content of [content] alone (a document has its id and name besides): the text and formalization when it has them */
+export function contentOf(content: Content): Content {
+    return {
+        theory: content.theory,
+        query: content.query,
+        flags: content.flags,
+        ...(content.text ? { text: content.text } : {}),
+        ...(content.formalization ? { formalization: content.formalization } : {}),
+    };
 }
 
 // --- version 1 -------------------------------------------------------------------------------------------------------
