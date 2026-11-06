@@ -46,6 +46,8 @@ jobs:
         with:
           name: playground
           path: packages/playground/dist
+          # .nojekyll among them: Pages publishes the files as built, without Jekyll
+          include-hidden-files: true
           retention-days: 1
       - name: Keep the components, to publish
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
