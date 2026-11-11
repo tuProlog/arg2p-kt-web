@@ -1,14 +1,13 @@
 {
   "name": "arg2p-kt-web",
   "private": true,
-  "description": "The user interface of Arg2P: its components (@tuprolog/arg2p-ui) and the web playground built with them",
+  "description": "The web playground of Arg2P, built with its components (@tuprolog/arg2p-ui, released with Arg2P)",
   "workspaces": [
-    "packages/ui",
     "packages/playground"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "check": "npm run check --workspaces --if-present",
-    "test": "npm run build -w @tuprolog/arg2p-ui && npm run check && npm test --workspaces --if-present"
+    "test": "npm run check && npm test --workspaces --if-present"
   }
 }

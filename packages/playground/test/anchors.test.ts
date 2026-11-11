@@ -43,7 +43,7 @@ describe('Statements of a theory', function () {
 
     it('should name rules, premises and axioms by their names, and leave out the flags', function () {
         const theory = [
-            'graphBuildMode(aspic_plus).',
+            'graphBuildMode(aspicPlus).',
             'r1 : bird(X), ~(penguin(X)) => flies(X).',
             'r2 : penguin(X) -> bird(X).',
             'f1 :=> penguin(tweety).',

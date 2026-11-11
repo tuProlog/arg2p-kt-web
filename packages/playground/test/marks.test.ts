@@ -4,7 +4,7 @@ import { linkMarks, tonesOf } from '../src/formalize/marks.js';
 const { deepEqual, equal } = assert;
 
 const TEXT = 'Birds normally fly. Penguins are birds. Tweety is a penguin. Penguins are birds, says the zoo.';
-const THEORY = 'graphBuildMode(aspic_plus).\nr1 : bird(X) => flies(X).\nr2 : penguin(X) -> bird(X).\nf1 :=> penguin(tweety).\n';
+const THEORY = 'graphBuildMode(aspicPlus).\nr1 : bird(X) => flies(X).\nr2 : penguin(X) -> bird(X).\nf1 :=> penguin(tweety).\n';
 const LINKS = [
     { statement: 'r1', quote: 'Birds normally fly' },
     { statement: 'r2', quote: 'Penguins are birds' },

@@ -1,5 +1,5 @@
 import { assert, describe, it } from 'vitest';
-import type { PairingLink } from '../src/federation/links.js';
+import type { ServerLink } from '../src/federation/links.js';
 import { shareUrl, type Shared } from '../src/links.js';
 import { followLinks } from '../src/router.js';
 
@@ -33,8 +33,8 @@ function fakeWindow(url: string) {
 
 /** What [window] is opened with, by kind */
 function follow(window: Window) {
-    const opened = { shared: [] as Shared[], pairing: [] as PairingLink[] };
-    const stop = followLinks(window, { shared: it => opened.shared.push(it), pairing: it => opened.pairing.push(it) });
+    const opened = { shared: [] as Shared[], federation: [] as ServerLink[] };
+    const stop = followLinks(window, { shared: it => opened.shared.push(it), federation: it => opened.federation.push(it) });
     return { opened, stop };
 }
 
@@ -52,7 +52,7 @@ describe('The links the playground is opened with', function () {
     it('should leave alone what is no link', function () {
         const page = fakeWindow(`${BASE}?stale=1#here`);
         const { opened } = follow(page.window);
-        deepEqual(opened, { shared: [], pairing: [] });
+        deepEqual(opened, { shared: [], federation: [] });
         equal(page.address(), `${BASE}?stale=1#here`);
     });
 
@@ -60,29 +60,30 @@ describe('The links the playground is opened with', function () {
         const page = fakeWindow(BASE);
         const { opened } = follow(page.window);
         page.launch(shareUrl(CONTENT, BASE));
-        page.launch(`${BASE}#join=abc`);
+        page.launch(`${BASE}#federate=wss%3A%2F%2Fhub%3A9432`);
         deepEqual(opened.shared, [{ content: CONTENT, errors: [] }]);
-        deepEqual(opened.pairing, [{ kind: 'join', code: 'abc' }]);
+        deepEqual(opened.federation, [{ url: 'wss://hub:9432', code: null }]);
         // the page stays where it is
         equal(page.address(), BASE);
     });
 
-    it('should open the links of pairings opened in the page, the same one again included', function () {
-        const page = fakeWindow(`${BASE}#join=abc`);
+    it('should open the links of servers opened in the page, the same one again included', function () {
+        const hub = '#federate=wss%3A%2F%2Fhub%3A9432&code=1234';
+        const page = fakeWindow(`${BASE}${hub}`);
         const { opened, stop } = follow(page.window);
         equal(page.address(), BASE);
-        page.open('#join=abc');
-        page.open('#reply=def');
-        deepEqual(opened.pairing, [
-            { kind: 'join', code: 'abc' },
-            { kind: 'join', code: 'abc' },
-            { kind: 'reply', code: 'def' },
+        page.open(hub);
+        page.open('#federate=ws%3A%2F%2Flocalhost%3A9431');
+        deepEqual(opened.federation, [
+            { url: 'wss://hub:9432', code: '1234' },
+            { url: 'wss://hub:9432', code: '1234' },
+            { url: 'ws://localhost:9431', code: null },
         ]);
         equal(page.address(), BASE);
         stop();
-        page.open('#join=ghi');
-        page.launch(`${BASE}#join=ghi`);
-        equal(opened.pairing.length, 3);
+        page.open(hub);
+        page.launch(`${BASE}${hub}`);
+        equal(opened.federation.length, 3);
     });
 
     it('should tell what was wrong with a shared link', function () {

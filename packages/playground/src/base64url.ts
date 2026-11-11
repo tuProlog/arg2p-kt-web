@@ -1,5 +1,4 @@
-// base64url (RFC 4648, its alphabet for URLs, with no padding): the shared links, and the keys and the sealed replies
-// of the pairings
+// base64url (RFC 4648, its alphabet for URLs, with no padding): the shared links
 
 /** [bytes] as base64url */
 export function toBase64url(bytes: Uint8Array): string {

@@ -157,7 +157,7 @@ describe('A formalization', function () {
     const TEXT = 'Birds normally fly. Tweety is a penguin, and penguins do not fly.';
     const answer = (theory: string, links: { statement: string; quote: string }[] = [], extra: Partial<Answer> = {}) =>
         JSON.stringify({ profile: '', theory, query: '', flags: '', links, glossary: [], ledger: [], notes: '', ...extra });
-    const STRUCTURED = 'graphBuildMode(aspic_plus).\nr1 : bird(X) => flies(X).\nf1 :=> penguin(tweety).\n';
+    const STRUCTURED = 'graphBuildMode(aspicPlus).\nr1 : bird(X) => flies(X).\nf1 :=> penguin(tweety).\n';
 
     function options(answers: { status: number; body: unknown }[], check: FormalizeOptions['check'] = async () => null) {
         const { post, asked } = openrouter(answers);

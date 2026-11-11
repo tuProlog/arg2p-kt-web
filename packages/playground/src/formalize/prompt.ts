@@ -52,7 +52,7 @@ export const SCHEMA = {
 
 const FRAMEWORKS: Record<Framework, string> = {
     structured:
-        'Write a structured theory: choose its profile as the method says (aspic_plus unless the text calls for another: aspic, aspic_defeasible, aba, aba_plus, meta). Never the profile abstract.',
+        'Write a structured theory: choose its profile as the method says (aspicPlus unless the text calls for another: aspic, aspicDefeasible, aba, abaPlus, meta). Never the profile abstract.',
     abstract:
         'Write an abstract framework, with graphBuildMode(abstract).: every self-contained position or claim of the text is an argument, named by a short lowercase atom saying what it is (raise_taxes, say); every objection, rebuttal or incompatibility is an attack (a -> b, or a <-> b when both ways). No rules, premises or preferences.',
 };

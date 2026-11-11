@@ -99,7 +99,7 @@ r2 : a -> y.
         'ABA',
         'abaPlus',
         'Preferred assumptions (ABA+)',
-        `graphBuildMode(aba_plus).
+        `graphBuildMode(abaPlus).
 
 assumption(a0).
 assumption(a1).

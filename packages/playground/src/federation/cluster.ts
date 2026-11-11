@@ -1,45 +1,40 @@
-import { Flags, WebWorkerCluster, type Solution } from '@tuprolog/arg2p';
+import { Federation, Flags, WebWorkerSolver, type Solution } from '@tuprolog/arg2p';
 import type { GraphData, SolutionData, SolveRequest } from '@tuprolog/arg2p-ui/data';
 import { compactGraphData } from '@tuprolog/arg2p-ui/js';
 import { profileOf } from '../documents.js';
 import { workerCount, type Cluster, type FederationStats, type ParallelRun } from './federation.js';
 import workerUrl from './worker.ts?worker&url';
 
-// The cluster of the playground: a WebWorkerCluster of @tuprolog/arg2p on Web Workers of this device (see worker.ts).
-// Loaded once a federation, or a parallel run, is asked for: it brings the solver with it.
+// The cluster of the playground: a WebWorkerSolver of @tuprolog/arg2p on Web Workers of this device (see worker.ts),
+// with its Federation, which connects to a server. Loaded once a federation, or a parallel run, is asked for: it brings
+// the solver with it.
 
 /**
- * A WebWorkerCluster as a solver: any goal on the theory and the flags of a run, solved by its workers and by those of
- * the devices it is paired with, one solution at a time with the graph of the last stage of its resolution
+ * A WebWorkerSolver as a solver: any goal on the theory and the flags of a run, solved by its workers and by those of
+ * the federation of the server it is connected to, one solution at a time with the graph of the last stage of its
+ * resolution
  */
 export class WebCluster implements Cluster {
     onChange: (() => void) | null = null;
 
-    private readonly cluster = new WebWorkerCluster(workerCount(), workerUrl);
+    private readonly solver = new WebWorkerSolver(workerCount(), workerUrl);
+    private readonly federation = new Federation(this.solver);
 
     constructor() {
-        this.cluster.onPeersChanged = () => this.onChange?.();
+        this.federation.onPeersChanged = () => this.onChange?.();
     }
 
-    invite(): Promise<string> {
-        return this.cluster.invite();
-    }
-
-    accept(invitation: string): Promise<string> {
-        return this.cluster.accept(invitation);
-    }
-
-    complete(reply: string): Promise<void> {
-        return this.cluster.complete(reply);
+    connect(url: string, code: string | null): Promise<void> {
+        return this.federation.connect(url, code);
     }
 
     async solve(request: SolveRequest, output: (text: string) => void): Promise<ParallelRun> {
         const goal = request.query.trim().replace(/\.$/, '');
         if (goal === '') throw { name: 'Query error', message: 'Query is a mandatory field.', syntax: null };
-        // the flags of the run, for the evaluations from now on: the pairings stay
-        this.cluster.flags = Flags.parse(request.flags);
-        this.cluster.load(request.theory);
-        const solver = this.cluster.solver;
+        // the flags of the run, for the evaluations from now on: the federation stays
+        this.solver.flags = Flags.parse(request.flags);
+        this.solver.load(request.theory);
+        const solver = this.solver.goals;
         solver.output = output;
         const profile = profileOf(request);
         const solutions = await solver.solve(goal);
@@ -59,15 +54,16 @@ export class WebCluster implements Cluster {
     }
 
     stop(): void {
-        this.cluster.solver.stop();
+        this.solver.goals.stop();
     }
 
     stats(): FederationStats {
-        // as plain data: what the cluster gives is read anew every time
-        const { site, sites, evaluation } = this.cluster.stats;
+        // as plain data: what the federation and the solver give is read anew every time
+        const { site, sites } = this.federation.stats;
+        const evaluation = this.solver.evaluation;
         return {
             site,
-            sites: sites.map(({ id, workers, delegate, via }) => ({ id, workers: workers ?? null, delegate, via: via ?? null })),
+            sites: sites.map(({ id, name, workers }) => ({ id, name, workers: workers ?? null })),
             evaluation:
                 evaluation == null
                     ? null
@@ -83,7 +79,7 @@ export class WebCluster implements Cluster {
     }
 
     close(): void {
-        this.cluster.close();
+        void this.federation.close().finally(() => this.solver.close());
     }
 }
 
