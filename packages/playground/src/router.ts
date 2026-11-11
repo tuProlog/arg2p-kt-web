@@ -1,8 +1,8 @@
-import { readPairing, type PairingLink } from './federation/links.js';
+import { readFederationLink, type ServerLink } from './federation/links.js';
 import { read, type Shared } from './links.js';
 
-// The links the playground is opened with: a setup shared (?s=, or the plain parameters, see links.ts), and a pairing
-// (#join=, #reply=, see federation/links.ts). They come by the address the page loads with, by its fragment as it
+// The links the playground is opened with: a setup shared (?s=, or the plain parameters, see links.ts), and the
+// federation of a server (#federate=, see federation/links.ts). They come by the address the page loads with, by its fragment as it
 // changes, and, in the installed app, by its launch queue: a link opened while the app is open focuses it (see
 // launch_handler in the manifest) rather than loading another page.
 
@@ -10,7 +10,7 @@ import { read, type Shared } from './links.js';
 export interface LinkHandlers {
     /** A setup shared: what it carries, and what was wrong with it */
     shared(link: Shared): void;
-    pairing(link: PairingLink): void;
+    federation(link: ServerLink): void;
 }
 
 // The launch queue of an installed app (not in every browser yet)
@@ -37,13 +37,13 @@ export function followLinks(target: Window & Launching, handlers: LinkHandlers):
         const { search, hash } = new URL(url, target.location.href);
         const shared = read(search);
         const sharing = shared.content !== null || shared.errors.length > 0;
-        const pairing = readPairing(hash);
-        if (here && (sharing || pairing !== null)) {
+        const federation = readFederationLink(hash);
+        if (here && (sharing || federation !== null)) {
             const { pathname, search: kept, hash: left } = target.location;
-            target.history.replaceState(null, '', pathname + (sharing ? '' : kept) + (pairing === null ? left : ''));
+            target.history.replaceState(null, '', pathname + (sharing ? '' : kept) + (federation === null ? left : ''));
         }
         if (sharing) handlers.shared(shared);
-        if (pairing !== null) handlers.pairing(pairing);
+        if (federation !== null) handlers.federation(federation);
     };
     const changed = () => take(target.location.href, true);
     take(target.location.href, true);

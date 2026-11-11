@@ -15,8 +15,8 @@ import type { ParallelSolver } from './federation.js';
 const STOPPED: EngineError = { name: 'Stopped', message: 'The query was stopped.', syntax: null, stopped: true };
 
 /**
- * The engine of the parallel runs: the solver of a cluster (the Web Workers of this device, and those of the devices
- * paired), which answers any query as the solver of the page does, one solution at a time, each with its graph. It has
+ * The engine of the parallel runs: the solver of a cluster (the Web Workers of this device, and those of the federation
+ * of the server it is connected to), which answers any query as the solver of the page does, one solution at a time, each with its graph. It has
  * no stages: the graph of a run is that of its last solution. The texts are checked, and the flags in effect told, by
  * the engine of the page ([local]).
  */

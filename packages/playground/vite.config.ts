@@ -17,6 +17,9 @@ export default defineConfig(({ command, isPreview }) => ({
     define: {
         __ARG2P_VERSION__: JSON.stringify(versionOf('@tuprolog/arg2p')),
     },
+    // the solver of the playground, for @tuprolog/arg2p-ui as well (its engine and worker import it, an optional peer):
+    // wherever npm puts the two, at the root of the workspaces or in the playground, they find the same one
+    resolve: { dedupe: ['@tuprolog/arg2p'] },
     // the worker of the solver is bundled on its own, with none of the plugins of the page
     worker: { format: 'es', plugins: () => [] },
     build: {
@@ -38,6 +41,11 @@ export default defineConfig(({ command, isPreview }) => ({
                 maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
                 // shared links carry their state in the query string (?s=...): they all open the precached page
                 ignoreURLParametersMatching: [/.*/],
+                // its responses isolated across origins, for the Web Workers of a cluster to share memory (see
+                // public/isolated.js); the page it first installs in taken over at once, to be loaded again isolated
+                // (see main.ts)
+                importScripts: ['isolated.js'],
+                clientsClaim: true,
             },
         }),
     ],

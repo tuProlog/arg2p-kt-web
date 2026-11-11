@@ -10,12 +10,12 @@ iOS) and then works offline, on desktops, tablets and phones.
 
 ## Packages
 
-- [`packages/ui`](packages/ui): `@tuprolog/arg2p-ui`, the user interface of
-  Arg2P as web components (the argument graph, the solutions, the drawing of
-  abstract frameworks), on any engine: the solver of the browser
-  (`@tuprolog/arg2p-ui/js`), or one of the JVM.
 - [`packages/playground`](packages/playground): the playground, the page
   published on GitHub Pages.
+
+It is built with `@tuprolog/arg2p-ui`, the user interface of Arg2P as web components (the argument graph, the
+solutions, the drawing of abstract frameworks), which is developed and released with Arg2P itself, in
+[tuProlog/arg2p-kt](https://github.com/tuProlog/arg2p-kt/tree/master/ui), at the same version.
 
 ## Install
 ```bash
@@ -24,14 +24,13 @@ iOS) and then works offline, on desktops, tablets and phones.
 
 ## Usage
 
-- Start the dev server of the playground, or the page the components are tried on
+- Start the dev server of the playground
 
 ```bash
   npm start -w @tuprolog/arg2p-playground
-  npm run dev -w @tuprolog/arg2p-ui
 ```
 
-- Run the tests of every package
+- Run the tests
 
 ```bash
   npm test
@@ -78,24 +77,20 @@ gear button): it is kept in your browser alone, and sent to OpenRouter alone, wh
 ## Parallel runs and the federation
 
 *Parallel*, a switch next to the tabs of the solver, runs the query on the parallel solver: on the Web Workers of the
-page (one less than the processors of the device, at most 4), and on those of the devices it is paired with, as the
-[federation](https://tuprolog.github.io/arg2p-kt/docs/modules/parallel-solver/) of the parallel solver. A parallel run
-answers what the solver of the page answers, a solution at a time with its graph, with no stages.
+page (one less than the processors of the device, at most 4), and on those of the federation of a server it is
+connected to, as the [federation](https://tuprolog.github.io/arg2p-kt/docs/modules/parallel/#federation) of the
+parallel solver. A parallel run answers what the solver of the page answers, a solution at a time with its graph, with
+no stages.
 
-The *Federation* tab pairs the playground with that of another device on the same network, and tells the devices
-paired, their workers, how they are linked, and what the last parallel run built and how long it took.
+The *Federation* tab connects the playground to a server of Arg2P: the extension of VS Code, or an instance on the JVM
+or Node.js, listening. Type the address of its WebSockets and the code it shows (a page on https, as this one, reaches
+`wss://` addresses alone, and `ws://localhost`), or open a link carrying them,
+`https://tuprolog.github.io/arg2p-kt-web/#federate=wss%3A%2F%2Fhost%3A9432&code=1234`, and confirm. The devices of the
+federation of the server lend each other their workers; the tab tells them, their workers, and what the last parallel
+run built and how long it took. Browsers cannot link to one another: with no server, the playground solves on its own
+Web Workers.
 
-1. *Invite a device* shows a QR code (and its link, to copy or share): the other device scans it with its camera, or
-   opens the link, and joins once asked (joining starts its workers, and connects to the device that invited).
-2. The other device shows a short code: type it on the device that invited, and they pair.
-
-The reply of the device that joins goes through a public relay, [ntfy.sh](https://ntfy.sh) unless another one is set
-(*Relay*, at the end of the tab: a ntfy server of your own works too), sealed with a key that only the QR code carries:
-the relay reads none of it, and the code tells which reply comes from the device in front of you. Should the relay be
-out of reach, the device that joins shows its reply as a QR code and a link: scan it, paste it, or open it on the device
-that invited.
-
-A device runs the theories the others send it: pair only with devices you trust.
+A device runs the theories the others send it: connect only to servers you trust.
 
 ## Sharing a setup
 

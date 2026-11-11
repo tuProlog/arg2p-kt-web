@@ -1,6 +1,6 @@
 import type { Storage } from './documents.js';
 
-// What the browser keeps for the playground: its settings (the theme, the layout, the relay), and the working memory
+// What the browser keeps for the playground: its settings (the theme, the layout, the key of the model), and the working memory
 // (see documents.ts). It may keep nothing (private mode, storage disabled, full): the playground works all the same,
 // and forgets.
 

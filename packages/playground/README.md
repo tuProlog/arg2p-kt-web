@@ -2,11 +2,12 @@
 
 The web playground of Arg2P, published at <https://tuprolog.github.io/arg2p-kt-web/>: what it does is told in the
 [README of the repository](../../README.md). It is built with the components of
-[`@tuprolog/arg2p-ui`](../ui): the theory is edited in an `<arg2p-editor>`, and solved in an `<arg2p-solver>`.
+[`@tuprolog/arg2p-ui`](https://github.com/tuProlog/arg2p-kt/tree/master/ui), released with Arg2P: the theory is edited
+in an `<arg2p-editor>`, and solved in an `<arg2p-solver>`.
 
 ```sh
 npm start -w @tuprolog/arg2p-playground   # the dev server
-npm test -w @tuprolog/arg2p-playground    # the tests (build the ui first: npm run build -w @tuprolog/arg2p-ui)
+npm test -w @tuprolog/arg2p-playground    # the tests
 npm run build -w @tuprolog/arg2p-playground
 ```
 
@@ -18,20 +19,19 @@ npm run build -w @tuprolog/arg2p-playground
 | `documents.ts`, `session.ts` | The documents worked on, kept in the browser (`localStorage`, under `arg2p.workspace.2`; `arg2p.workspace`, of version 1, is only read once), in step with the other pages open |
 | `engines.ts` | The engines of the documents: each solves on a Web Worker of its own, so that its results (its solutions, Next, the stages) are there when it is shown again; the workers of the documents used last are kept (6, 3 on phones), and a run whose worker was let go is solved again, past the solutions given, when asked for more |
 | `tabs.ts`, `layout.ts`, `share.ts`, `menus.ts` | The tabs of the documents, the dividers and the widths they keep, the dialog of a shared link, the menus |
-| `links.ts`, `router.ts` | The links that share a theory, its query and its flags; the links the page is opened with, in the page or in the installed app: a shared one opens in a tab, one of a pairing in the *Federation* tab |
-| `federation/` | Parallel runs, and the federation with the playgrounds of other devices |
+| `links.ts`, `router.ts` | The links that share a theory, its query and its flags; the links the page is opened with, in the page or in the installed app: a shared one opens in a tab, one of a server in the *Federation* tab |
+| `federation/` | Parallel runs, and the federation with a server |
 | `formalize/` | A text in natural language, formalized by a language model as a theory, its statements linked to the passages they come from |
 
 ## The federation
 
 | | |
 | --- | --- |
-| `federation.ts` | The federation of the page: its cluster, started once asked for, its pairing, and what it is |
-| `cluster.ts` | The cluster, a `WebWorkerCluster` of `@tuprolog/arg2p` on Web Workers (`worker.ts`): loaded with the solver, apart from the page. It solves any goal, on the flags of the run, and tells what its federation is |
+| `federation.ts` | The federation of the page: its cluster, started once asked for, the server it connects to, and what it is |
+| `cluster.ts` | The cluster, a `WebWorkerSolver` of `@tuprolog/arg2p` on Web Workers (`worker.ts`) with its `Federation`: loaded with the solver, apart from the page. It solves any goal, on the flags of the run, connects to a server, and tells what its federation is |
 | `engine.ts` | `ClusterEngine`, the engine of the parallel runs (the `Engine` of the ui) on the cluster |
-| `pairing.ts`, `relay.ts` | The pairing: an invitation as one QR code, its reply sealed (AES-GCM) through a ntfy relay (an https address) with a short code, or as a link. An invitation lasts 10 minutes, reads the relay while its page is shown, and pairs with no code two different replies came with |
-| `links.ts` | The links of a pairing (`#join=`, `#reply=`), and the codes they carry |
-| `panel.ts`, `qr.ts` | The *Federation* tab, a tab of the solver, and its QR codes, drawn and scanned |
+| `links.ts` | The links of a server (`#federate=` its address, `&code=` its code), and the addresses a page can reach |
+| `panel.ts` | The *Federation* tab, a tab of the solver: the address and the code of a server, the devices, the last run |
 
 ## The formalization
 

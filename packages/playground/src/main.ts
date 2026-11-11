@@ -7,6 +7,11 @@ import './app.js';
 const LOOK_EVERY = 60 * 60_000;
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    // The page of a first visit is not isolated across origins, as only the responses of the service worker are (see
+    // public/isolated.js): loaded again, once, as soon as the service worker takes it over
+    if (!self.crossOriginIsolated && navigator.serviceWorker.controller === null) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+    }
     import('virtual:pwa-register').then(({ registerSW }) => {
         const updateSW = registerSW({
             immediate: true,

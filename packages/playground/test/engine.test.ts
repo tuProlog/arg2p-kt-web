@@ -7,7 +7,7 @@ const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
 
 const graph = (id: string): GraphData => ({
-    profile: 'aspic_plus',
+    profile: 'aspicPlus',
     arguments: [{ id, descriptor: '', conclusion: id, topRule: 'none', label: 'in', supports: [] }],
     attacks: [],
 });

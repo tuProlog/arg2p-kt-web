@@ -149,7 +149,7 @@ export class Arg2pPlayground extends LitElement {
         this.stops.push(
             followLinks(window, {
                 shared: link => this.openShared(link),
-                pairing: link => void this.updateComplete.then(() => this.renderRoot.querySelector('arg2p-federation')?.open(link)),
+                federation: link => void this.updateComplete.then(() => this.renderRoot.querySelector('arg2p-federation')?.open(link)),
             }),
         );
         // the first evaluation is much slower than the next ones: the solver warms up meanwhile
@@ -503,7 +503,7 @@ export class Arg2pPlayground extends LitElement {
                 <label
                     slot="actions"
                     class="mode ${this.parallel ? 'on' : ''}"
-                    title="Solve in parallel on the ${workerCount()} Web Workers of this device${devices > 0 ? `, and on those of the ${devices} paired` : ''}"
+                    title="Solve in parallel on the ${workerCount()} Web Workers of this device${devices > 0 ? `, and on those of the ${devices} of the federation` : ''}"
                 >
                     <input type="checkbox" role="switch" .checked=${this.parallel} ?disabled=${this.busy} @change=${(e: Event) => (this.parallel = (e.target as HTMLInputElement).checked)} />
                     Parallel

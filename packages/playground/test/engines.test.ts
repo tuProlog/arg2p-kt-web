@@ -5,7 +5,7 @@ import { EnginePool, type WorkerEngine } from '../src/engines.js';
 const { deepEqual, equal } = assert;
 const ok: (value: unknown, message?: string) => void = assert.ok;
 
-const EMPTY: GraphData = { profile: 'aspic_plus', arguments: [], attacks: [] };
+const EMPTY: GraphData = { profile: 'aspicPlus', arguments: [], attacks: [] };
 const GONE: EngineError = { name: 'Error', message: 'This query is no longer running.', syntax: null };
 
 // A worker whose queries have [count] solutions, numbered; what it was asked, kept. Like the worker of the page, it
