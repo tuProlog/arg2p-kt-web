@@ -114,8 +114,8 @@ export class DocumentEngine implements Engine {
         return this.latest;
     }
 
-    check(text: string, kind: 'theory' | 'query'): Promise<SyntaxProblem | null> {
-        return this.shared.check(text, kind);
+    check(text: string, kind: 'theory' | 'query', flags?: string): Promise<SyntaxProblem | null> {
+        return this.shared.check(text, kind, flags);
     }
 
     settings(theory: string, flags: string): Promise<Settings> {

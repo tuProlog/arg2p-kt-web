@@ -104,6 +104,29 @@ describe('The engine of the parallel runs', function () {
         deepEqual(cluster.requests, []);
     });
 
+    it('should check the theory with the flags of the run, as the solver reads it', async function () {
+        // the engine of the page reads `a <-> b.` with the notation of the languages the flags name alone
+        const asked: { text: string; flags: string | undefined }[] = [];
+        const page: Engine = {
+            ...local,
+            check: async (text, _kind, flags) => {
+                asked.push({ text, flags });
+                return text.includes('<->') && !flags?.includes('abstract') ? { line: 1, column: 3, length: 3, message: 'bad' } : null;
+            },
+        };
+        const cluster = new FakeCluster([solution('a')]);
+        const engine = new ClusterEngine(async () => cluster, page);
+        const framework = { theory: 'a <-> b.', query: 'buildLabelSets(In, Out, Und)', flags: 'graphBuildMode(abstract).' };
+        await engine.solve(framework);
+        deepEqual(cluster.requests, [framework]);
+        // the theory with the flags; the flags and the query with none
+        deepEqual(asked, [
+            { text: 'a <-> b.', flags: 'graphBuildMode(abstract).' },
+            { text: 'graphBuildMode(abstract).', flags: '' },
+            { text: 'buildLabelSets(In, Out, Und)', flags: '' },
+        ]);
+    });
+
     it('should tell what the run prints, while it is the latest', async function () {
         const printed: string[] = [];
         const cluster = new FakeCluster([solution('a')]);

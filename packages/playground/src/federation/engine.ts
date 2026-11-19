@@ -52,8 +52,8 @@ export class ClusterEngine implements Engine {
         };
     }
 
-    check(text: string, kind: 'theory' | 'query'): Promise<SyntaxProblem | null> {
-        return this.local.check(text, kind);
+    check(text: string, kind: 'theory' | 'query', flags?: string): Promise<SyntaxProblem | null> {
+        return this.local.check(text, kind, flags);
     }
 
     settings(theory: string, flags: string): Promise<Settings> {
@@ -61,14 +61,15 @@ export class ClusterEngine implements Engine {
     }
 
     // Where the theory, the flags or the query of [request] do not parse, as the engine of the page reads them, as the
-    // error of a run that cannot start; null if they all do
+    // error of a run that cannot start; null if they all do (the theory read with the notation of the languages the
+    // flags name, as the solver reads it)
     private async problem({ theory, flags, query }: SolveRequest): Promise<EngineError | null> {
         const texts = [
-            { where: 'theory', text: theory, kind: 'theory', name: 'Theory error' },
-            { where: 'flags', text: flags, kind: 'theory', name: 'Flags error' },
-            { where: 'query', text: query, kind: 'query', name: 'Query error' },
+            { where: 'theory', text: theory, kind: 'theory', name: 'Theory error', flags },
+            { where: 'flags', text: flags, kind: 'theory', name: 'Flags error', flags: '' },
+            { where: 'query', text: query, kind: 'query', name: 'Query error', flags: '' },
         ] as const;
-        const problems = await Promise.all(texts.map(it => this.local.check(it.text, it.kind)));
+        const problems = await Promise.all(texts.map(it => this.local.check(it.text, it.kind, it.flags)));
         const at = problems.findIndex(it => it !== null);
         if (at === -1) return null;
         const problem = problems[at]!;

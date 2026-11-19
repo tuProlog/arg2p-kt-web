@@ -457,6 +457,7 @@ export class Arg2pPlayground extends LitElement {
                     label="Theory"
                     placeholder="A theory: rules, facts, and its flags (graphBuildMode(abstract). for an abstract framework)"
                     .engine=${this.local}
+                    .flags=${this.content.flags}
                     .value=${this.content.theory}
                     .marks=${marks?.theory ?? []}
                     @arg2p-change=${(e: CustomEvent<{ value: string }>) => this.edit({ theory: e.detail.value })}
